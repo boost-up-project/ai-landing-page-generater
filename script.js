@@ -99,6 +99,7 @@ const brandState = {
   error: "",
   notice: "",
 };
+const assetPreviewUrls = new WeakMap();
 
 const app = document.querySelector("#app");
 const navigation = document.querySelector("#pageNavigation");
@@ -403,16 +404,42 @@ function reviewColorPalette(content) {
     </div>`;
 }
 
+function previewUrlFor(file) {
+  if (!assetPreviewUrls.has(file)) {
+    assetPreviewUrls.set(file, URL.createObjectURL(file));
+  }
+  return assetPreviewUrls.get(file);
+}
+
+function visualAssetPreview(group) {
+  const files = brandState.files[group] || [];
+  if (!files.length) return "";
+  const label = group === "logo" ? "로고" : "아이콘";
+  return `
+    <div class="visual-asset-preview" aria-label="업로드한 ${label} 미리보기">
+      ${files.map((file) => `
+        <figure class="visual-asset-preview__card">
+          <div class="visual-asset-preview__canvas">
+            <img src="${previewUrlFor(file)}" alt="${escapeHTML(file.name)} 미리보기" />
+          </div>
+          <figcaption>${escapeHTML(file.name)}</figcaption>
+        </figure>`).join("")}
+    </div>`;
+}
+
 function reviewItem(index, options = {}) {
   const {
     title = "소제목",
     content = "정리된 내용",
     references = [],
     path = "",
+    assetGroup = "",
   } = options;
+  const directAssets = assetGroup ? brandState.files[assetGroup] : [];
   const chips = references.length
     ? `<div class="inline-chips">${references.map((reference) => chipMarkup(`${reference.filename} · p.${reference.page}`)).join("")}</div>`
-    : '<span class="field-caption">PDF에서 확인된 출처가 없습니다.</span>';
+    : `<span class="field-caption">${directAssets.length ? "직접 업로드한 원본 파일입니다." : "PDF에서 확인된 출처가 없습니다."}</span>`;
+  const assetPreview = assetGroup ? visualAssetPreview(assetGroup) : "";
   const colorPalette = path === "visual_guideline.color"
     ? reviewColorPalette(content)
     : "";
@@ -425,6 +452,7 @@ function reviewItem(index, options = {}) {
         </span>
       </div>
       ${chips}
+      ${assetPreview}
       ${colorPalette}
       <div class="textarea-wrap">
         <textarea class="review-textarea" data-brand-path="${path}" data-original-value="${escapeHTML(content)}">${escapeHTML(content)}</textarea>
@@ -445,6 +473,9 @@ function actualBrandReviewMarkup() {
         content: section.content,
         references: section.source_references,
         path: `${groupKey}.${fieldKey}`,
+        assetGroup: groupKey === "visual_guideline" && ["logo", "icon"].includes(fieldKey)
+          ? fieldKey
+          : "",
       });
     }).join("");
     return `
@@ -678,7 +709,12 @@ app.addEventListener("click", async (event) => {
     const group = removeFile.dataset.brandGroup;
     const index = Number(removeFile.dataset.fileIndex);
     if (group && Number.isInteger(index) && index >= 0) {
-      brandState.files[group].splice(index, 1);
+      const [removedFile] = brandState.files[group].splice(index, 1);
+      const previewUrl = assetPreviewUrls.get(removedFile);
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        assetPreviewUrls.delete(removedFile);
+      }
       brandState.error = "";
       render();
     } else {

@@ -514,6 +514,56 @@ button {
   font-size: 10px;
 }
 
+.visual-asset-preview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin: 8px 0;
+}
+
+.visual-asset-preview__card {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.visual-asset-preview__canvas {
+  display: grid;
+  min-height: 120px;
+  padding: 16px;
+  place-items: center;
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, #f1f3f5 25%, transparent 25%),
+    linear-gradient(-45deg, #f1f3f5 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #f1f3f5 75%),
+    linear-gradient(-45deg, transparent 75%, #f1f3f5 75%);
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-size: 16px 16px;
+}
+
+.visual-asset-preview__canvas img {
+  display: block;
+  width: 100%;
+  max-width: 280px;
+  height: 96px;
+  object-fit: contain;
+}
+
+.visual-asset-preview__card figcaption {
+  padding: 7px 9px;
+  overflow: hidden;
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .completed-file-wrap {
   display: flex;
   width: 100%;
