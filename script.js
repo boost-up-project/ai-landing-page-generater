@@ -10,11 +10,51 @@ const screens = [
 ];
 
 const brandUploadFields = [
-  { key: "brand_identity", title: "Brand Identity" },
-  { key: "verbal_guideline", title: "Verbal Guideline" },
-  { key: "logo", title: "Logo" },
-  { key: "icon", title: "Icon" },
-  { key: "fonts", title: "Typography" },
+  {
+    key: "brand_identity",
+    title: "Brand Identity",
+    accept: "application/pdf,.pdf",
+    extensions: [".pdf"],
+    placeholder: "PDF 파일을 첨부하세요.",
+    caption: "브랜드 정체성과 철학을 확인할 수 있는 PDF를 첨부해 주세요.",
+    formatLabel: "PDF",
+  },
+  {
+    key: "verbal_guideline",
+    title: "Verbal Guideline",
+    accept: "application/pdf,.pdf",
+    extensions: [".pdf"],
+    placeholder: "PDF 파일을 첨부하세요.",
+    caption: "브랜드 보이스와 문체를 확인할 수 있는 PDF를 첨부해 주세요.",
+    formatLabel: "PDF",
+  },
+  {
+    key: "logo",
+    title: "Logo",
+    accept: "image/svg+xml,image/png,image/jpeg,.svg,.png,.jpg,.jpeg",
+    extensions: [".svg", ".png", ".jpg", ".jpeg"],
+    placeholder: "SVG, PNG, JPG 또는 JPEG 파일을 첨부하세요.",
+    caption: "로고 원본 또는 미리보기 이미지를 첨부해 주세요.",
+    formatLabel: "SVG, PNG, JPG, JPEG",
+  },
+  {
+    key: "icon",
+    title: "Icon",
+    accept: "image/svg+xml,image/png,image/jpeg,.svg,.png,.jpg,.jpeg",
+    extensions: [".svg", ".png", ".jpg", ".jpeg"],
+    placeholder: "SVG, PNG, JPG 또는 JPEG 파일을 첨부하세요.",
+    caption: "아이콘 원본 또는 미리보기 이미지를 첨부해 주세요.",
+    formatLabel: "SVG, PNG, JPG, JPEG",
+  },
+  {
+    key: "fonts",
+    title: "Typography",
+    accept: "font/ttf,.ttf",
+    extensions: [".ttf"],
+    placeholder: "TTF 폰트 파일을 첨부하세요.",
+    caption: "브랜드에서 사용하는 TTF 폰트 파일을 첨부해 주세요.",
+    formatLabel: "TTF",
+  },
 ];
 
 const brandReviewFields = {
@@ -52,6 +92,8 @@ const brandReviewFields = {
 
 const brandState = {
   files: Object.fromEntries(brandUploadFields.map(({ key }) => [key, []])),
+  colors: [],
+  colorDraft: "",
   analysis: null,
   markdown: "",
   error: "",
@@ -108,7 +150,9 @@ function progressMarkup(progress) {
 function brandWorkspaceLabel() {
   const sourceName = brandState.analysis?.source_files?.[0]
     || allBrandFiles()[0]?.name;
-  return sourceName ? sourceName.replace(/\.pdf$/i, "") : "New Brand";
+  return sourceName
+    ? sourceName.replace(/\.(pdf|svg|png|jpe?g|ttf)$/i, "")
+    : "New Brand";
 }
 
 function headerMarkup(title, description, progress) {
@@ -139,15 +183,19 @@ function emptyFileInput(
   caption = "브랜드 정보를 확인할 수 있는 PDF 파일을 첨부해 주세요.",
   group = "",
 ) {
+  const config = brandUploadFields.find((field) => field.key === group);
   const groupAttribute = group ? `data-brand-group="${group}"` : "";
+  const accept = config?.accept || "application/pdf,.pdf";
+  const placeholder = config?.placeholder || "PDF 파일을 첨부하세요.";
+  const resolvedCaption = config?.caption || caption;
   return `
     <label class="file-input">
       <span class="file-input__control">
         <img src="assets/file.svg" alt="" />
-        <span class="file-input__placeholder">PDF 파일을 첨부하세요.</span>
+        <span class="file-input__placeholder">${placeholder}</span>
       </span>
-      <span class="field-caption">${caption}</span>
-      <input type="file" accept="application/pdf,.pdf" multiple data-file-input ${groupAttribute} />
+      <span class="field-caption">${resolvedCaption}</span>
+      <input type="file" accept="${accept}" multiple data-file-input ${groupAttribute} />
     </label>`;
 }
 
@@ -194,16 +242,43 @@ function addFileButton(group = "") {
 }
 
 function hiddenFileInput(group) {
-  return `<input class="visually-hidden" type="file" accept="application/pdf,.pdf" multiple data-file-input data-brand-group="${group}" />`;
+  const config = brandUploadFields.find((field) => field.key === group);
+  return `<input class="visually-hidden" type="file" accept="${config.accept}" multiple data-file-input data-brand-group="${group}" />`;
 }
 
 function colorInput() {
+  const palette = brandState.colors.length
+    ? `<div class="brand-color-palette" aria-label="선택한 브랜드 색상">
+        ${brandState.colors.map((color, index) => `
+          <div class="brand-color-chip">
+            <span class="brand-color-chip__swatch" style="background:${color}" aria-hidden="true"></span>
+            <span class="brand-color-chip__value">${color}</span>
+            <button type="button" data-remove-color data-color-index="${index}" aria-label="${color} 색상 삭제">×</button>
+          </div>`).join("")}
+      </div>`
+    : '<p class="color-empty">아직 추가한 색상이 없습니다.</p>';
   return `
-    <div class="color-input" aria-label="브랜드 색상">
-      <img class="color-input__swatches" src="assets/color-swatches.svg" alt="" />
-      <button class="color-input__add" type="button" aria-label="색상 추가">
-        <img src="assets/add-color.svg" alt="" />
-      </button>
+    <div class="brand-color-input" aria-label="브랜드 색상">
+      <div class="brand-color-input__controls">
+        <input
+          class="brand-color-input__hex"
+          type="text"
+          value="${escapeHTML(brandState.colorDraft)}"
+          placeholder="#1F4D3A"
+          maxlength="7"
+          autocomplete="off"
+          spellcheck="false"
+          data-color-hex
+          aria-label="HEX 색상값"
+        />
+        <button class="brand-color-input__add" type="button" data-add-color>색상 추가</button>
+        <label class="brand-color-input__picker" title="색상 선택기 열기">
+          <span aria-hidden="true"></span>
+          <input type="color" value="#1F4D3A" data-native-color aria-label="색상 선택기" />
+        </label>
+        <button class="brand-color-input__eyedropper" type="button" data-eyedropper>스포이트</button>
+      </div>
+      ${palette}
     </div>`;
 }
 
@@ -246,7 +321,7 @@ function brandInputMarkup(isUploaded) {
             <li class="visual-field">
               <span class="visual-field__name">Color</span>
               ${colorInput()}
-              <span class="field-caption">색상은 PDF 분석 결과에서 확인하고 검토 단계에서 수정할 수 있습니다.</span>
+              <span class="field-caption">HEX 값을 입력하거나 색상 선택기·스포이트로 브랜드 색상을 추가해 주세요.</span>
             </li>
           </ol>
         </section>
@@ -258,11 +333,29 @@ function allBrandFiles() {
   return Object.values(brandState.files).flat();
 }
 
+function brandDocumentFiles() {
+  return [
+    ...brandState.files.brand_identity,
+    ...brandState.files.verbal_guideline,
+  ];
+}
+
+function brandVisualFiles() {
+  return [
+    ...brandState.files.logo,
+    ...brandState.files.icon,
+    ...brandState.files.fonts,
+  ];
+}
+
 function loadingMarkup(type) {
   const brandRows = allBrandFiles().map((file, index) => [
     index === 0 ? "loading" : "waiting",
     `${index === 0 ? "문서 읽는 중" : "대기 중"} · ${file.name}`,
   ]);
+  if (type === "brand" && brandState.colors.length) {
+    brandRows.push(["waiting", `색상 정리 중 · ${brandState.colors.join(", ")}`]);
+  }
   const rows = type === "brand" && brandRows.length
     ? brandRows
     : [
@@ -292,6 +385,24 @@ function chipMarkup(name = "Brand Identity_IKEA.pdf", removable = false) {
     </span>`;
 }
 
+function extractHexColors(content) {
+  return [...new Set(content.match(/#[0-9A-Fa-f]{6}\b/g) || [])]
+    .map((color) => color.toUpperCase());
+}
+
+function reviewColorPalette(content) {
+  const colors = extractHexColors(content);
+  if (!colors.length) return "";
+  return `
+    <div class="review-color-palette" aria-label="분석된 브랜드 색상">
+      ${colors.map((color) => `
+        <div class="review-color-swatch">
+          <span style="background:${color}" aria-hidden="true"></span>
+          <small>${color}</small>
+        </div>`).join("")}
+    </div>`;
+}
+
 function reviewItem(index, options = {}) {
   const {
     title = "소제목",
@@ -302,6 +413,9 @@ function reviewItem(index, options = {}) {
   const chips = references.length
     ? `<div class="inline-chips">${references.map((reference) => chipMarkup(`${reference.filename} · p.${reference.page}`)).join("")}</div>`
     : '<span class="field-caption">PDF에서 확인된 출처가 없습니다.</span>';
+  const colorPalette = path === "visual_guideline.color"
+    ? reviewColorPalette(content)
+    : "";
   return `
     <div class="review-item">
       <div class="review-item__header">
@@ -311,6 +425,7 @@ function reviewItem(index, options = {}) {
         </span>
       </div>
       ${chips}
+      ${colorPalette}
       <div class="textarea-wrap">
         <textarea class="review-textarea" data-brand-path="${path}" data-original-value="${escapeHTML(content)}">${escapeHTML(content)}</textarea>
         <img class="textarea-grip" src="assets/grip.svg" alt="" />
@@ -415,14 +530,20 @@ function updateNavigation(screen) {
 }
 
 async function analyzeBrand() {
-  const files = allBrandFiles();
-  if (!files.length) {
+  const documents = brandDocumentFiles();
+  const visualFiles = brandVisualFiles();
+  if (!documents.length) {
     brandState.error = "분석할 PDF 파일을 한 개 이상 첨부해 주세요.";
     routeTo(0);
     return;
   }
-  if (files.length > 10) {
+  if (documents.length > 10) {
     brandState.error = "PDF 파일은 최대 10개까지 첨부할 수 있습니다.";
+    render();
+    return;
+  }
+  if (visualFiles.length > 20) {
+    brandState.error = "로고, 아이콘, 폰트 파일은 합쳐서 최대 20개까지 첨부할 수 있습니다.";
     render();
     return;
   }
@@ -431,7 +552,13 @@ async function analyzeBrand() {
   brandState.notice = "";
   routeTo(2);
   try {
-    brandState.analysis = await window.BrandAPI.analyze(files);
+    brandState.analysis = await window.BrandAPI.analyze({
+      documents,
+      logos: brandState.files.logo,
+      icons: brandState.files.icon,
+      fonts: brandState.files.fonts,
+      colors: brandState.colors,
+    });
     routeTo(3);
   } catch (error) {
     brandState.error = error.message;
@@ -472,6 +599,44 @@ async function finalizeBrand() {
   }
 }
 
+function normalizeHexColor(value) {
+  let hex = value.trim().replace(/^#/, "");
+  if (/^[0-9a-fA-F]{3}$/.test(hex)) {
+    hex = [...hex].map((character) => character.repeat(2)).join("");
+  }
+  return /^[0-9a-fA-F]{6}$/.test(hex) ? `#${hex.toUpperCase()}` : null;
+}
+
+function addBrandColor(value) {
+  const color = normalizeHexColor(value);
+  if (!color) {
+    brandState.error = "색상은 #1F4D3A처럼 3자리 또는 6자리 HEX 값으로 입력해 주세요.";
+    render();
+    return;
+  }
+  if (!brandState.colors.includes(color)) brandState.colors.push(color);
+  brandState.colorDraft = "";
+  brandState.error = "";
+  brandState.notice = "";
+  routeTo(1);
+}
+
+async function pickColorFromScreen() {
+  if (!("EyeDropper" in window)) {
+    app.querySelector("[data-native-color]")?.click();
+    return;
+  }
+  try {
+    const result = await new window.EyeDropper().open();
+    addBrandColor(result.sRGBHex);
+  } catch (error) {
+    if (error.name !== "AbortError") {
+      brandState.error = "화면에서 색상을 선택하지 못했습니다. 색상 선택기를 이용해 주세요.";
+      render();
+    }
+  }
+}
+
 previousButton.addEventListener("click", () => {
   const previousIndex = screens[currentIndex - 1]?.endsWith("-loading") ? currentIndex - 2 : currentIndex - 1;
   routeTo(previousIndex);
@@ -480,7 +645,7 @@ previousButton.addEventListener("click", () => {
 nextButton.addEventListener("click", async () => {
   const screen = screens[currentIndex];
   if (screen === "brand-input") {
-    if (!allBrandFiles().length) {
+    if (!brandDocumentFiles().length) {
       brandState.error = "분석할 PDF 파일을 한 개 이상 첨부해 주세요.";
       render();
       return;
@@ -499,12 +664,15 @@ nextButton.addEventListener("click", async () => {
   if (currentIndex < screens.length - 1) routeTo(currentIndex + 1);
 });
 
-app.addEventListener("click", (event) => {
+app.addEventListener("click", async (event) => {
   const removeFile = event.target.closest("[data-remove-file]");
   const removeChip = event.target.closest("[data-remove-chip]");
   const removeItem = event.target.closest("[data-remove-item]");
+  const removeColor = event.target.closest("[data-remove-color]");
   const refresh = event.target.closest("[data-refresh]");
   const addFile = event.target.closest("[data-add-file]");
+  const addColor = event.target.closest("[data-add-color]");
+  const eyedropper = event.target.closest("[data-eyedropper]");
 
   if (removeFile) {
     const group = removeFile.dataset.brandGroup;
@@ -519,6 +687,11 @@ app.addEventListener("click", (event) => {
   }
   if (removeChip) removeChip.closest(".file-chip")?.remove();
   if (removeItem) removeItem.closest(".review-item")?.remove();
+  if (removeColor) {
+    brandState.colors.splice(Number(removeColor.dataset.colorIndex), 1);
+    brandState.error = "";
+    render();
+  }
   if (refresh) {
     const textarea = refresh.closest(".review-item")?.querySelector("textarea");
     if (textarea) textarea.value = textarea.dataset.originalValue || "";
@@ -530,6 +703,8 @@ app.addEventListener("click", (event) => {
       : "input[type='file']";
     addFile.closest(".file-section__body")?.querySelector(selector)?.click();
   }
+  if (addColor) addBrandColor(brandState.colorDraft);
+  if (eyedropper) await pickColorFromScreen();
 });
 
 app.addEventListener("change", (event) => {
@@ -543,10 +718,14 @@ app.addEventListener("change", (event) => {
   }
 
   const selectedFiles = Array.from(input.files);
-  const invalidFile = selectedFiles.find((file) => !file.name.toLowerCase().endsWith(".pdf"));
+  const config = brandUploadFields.find((field) => field.key === group);
+  const invalidFile = selectedFiles.find((file) => {
+    const filename = file.name.toLowerCase();
+    return !config.extensions.some((extension) => filename.endsWith(extension));
+  });
   const oversizedFile = selectedFiles.find((file) => file.size > 20 * 1024 * 1024);
   if (invalidFile) {
-    brandState.error = `${invalidFile.name}: PDF 파일만 첨부할 수 있습니다.`;
+    brandState.error = `${invalidFile.name}: ${config.formatLabel} 파일만 첨부할 수 있습니다.`;
     render();
     return;
   }
@@ -563,6 +742,23 @@ app.addEventListener("change", (event) => {
 
 app.addEventListener("input", (event) => {
   if (event.target.matches("[data-brand-path]")) brandState.error = "";
+  if (event.target.matches("[data-color-hex]")) {
+    brandState.colorDraft = event.target.value;
+    brandState.error = "";
+  }
+});
+
+app.addEventListener("change", (event) => {
+  if (event.target.matches("[data-native-color]")) {
+    addBrandColor(event.target.value);
+  }
+});
+
+app.addEventListener("keydown", (event) => {
+  if (event.target.matches("[data-color-hex]") && event.key === "Enter") {
+    event.preventDefault();
+    addBrandColor(event.target.value);
+  }
 });
 
 window.addEventListener("hashchange", () => {

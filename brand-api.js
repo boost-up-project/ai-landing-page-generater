@@ -36,9 +36,13 @@
   }
 
   window.BrandAPI = {
-    async analyze(files) {
+    async analyze({ documents, logos, icons, fonts, colors }) {
       const formData = new FormData();
-      files.forEach((file) => formData.append("files", file, file.name));
+      documents.forEach((file) => formData.append("files", file, file.name));
+      logos.forEach((file) => formData.append("logo_files", file, file.name));
+      icons.forEach((file) => formData.append("icon_files", file, file.name));
+      fonts.forEach((file) => formData.append("font_files", file, file.name));
+      colors.forEach((color) => formData.append("colors", color));
       return request("/brands/analyze", {
         method: "POST",
         body: formData,
