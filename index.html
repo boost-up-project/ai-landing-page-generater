@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Local API URL (disabled):
+    <meta name="api-base-url" content="http://127.0.0.1:8000/api" />
+    -->
+    <script src="runtime-config.js"></script>
+    <title>AI Landing Page Generator</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="brand-api.js?v=3" defer></script>
+    <script src="script.js?v=4" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="주요 메뉴">
+        <nav class="sidebar__nav" aria-label="도구">
+          <button class="sidebar__item sidebar__item--round" type="button" aria-label="앱">
+            <img src="assets/apps.svg" alt="" />
+          </button>
+          <button class="sidebar__item" type="button" aria-label="검색">
+            <img class="sidebar__icon--small" src="assets/search.svg" alt="" />
+          </button>
+          <button class="sidebar__item" type="button" aria-label="즐겨찾기">
+            <img class="sidebar__icon--small" src="assets/star.svg" alt="" />
+          </button>
+          <button class="sidebar__item sidebar__item--round" type="button" aria-label="새로 만들기">
+            <img class="sidebar__icon--small" src="assets/plus-circle.svg" alt="" />
+          </button>
+        </nav>
+        <div class="sidebar__profile" aria-label="프로필">
+          <img src="assets/profile.svg" alt="" />
+        </div>
+      </aside>
+
+      <main class="page">
+        <div id="app"></div>
+        <nav class="page-navigation" id="pageNavigation" aria-label="페이지 이동">
+          <button class="page-direction page-direction--previous" id="previousButton" type="button">
+            <img src="assets/chevron-left.svg" alt="" />
+            <span>Previous</span>
+          </button>
+          <button class="page-direction page-direction--next" id="nextButton" type="button">
+            <span>Next</span>
+            <img src="assets/chevron-right.svg" alt="" />
+          </button>
+        </nav>
+      </main>
+    </div>
+  </body>
+</html>
