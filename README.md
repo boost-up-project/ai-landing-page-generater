@@ -9,16 +9,35 @@
 python3 -m http.server 5500
 ```
 
-브라우저에서 `http://127.0.0.1:5500`에 접속한다. 브랜드 분석 API는 기본적으로
-`http://127.0.0.1:8000/api`를 사용하므로 백엔드 서버도 함께 실행해야 한다.
+브라우저에서 `http://127.0.0.1:5500`에 접속한다. 로컬 브랜드 분석 API를
+사용하려면 `runtime-config.js`에 `http://127.0.0.1:8000/api`를 지정하고
+백엔드 서버도 함께 실행해야 한다.
 
 ```bash
 cd ../ai-landing-page-generater-server
 uv run uvicorn app.main:app --reload
 ```
 
-API 주소를 변경해야 할 경우 `index.html`의 `api-base-url` 메타 태그 값을
-수정한다.
+API 주소는 `runtime-config.js`에서 지정한다.
+
+```js
+window.BRAND_API_BASE_URL = "http://127.0.0.1:8000/api";
+```
+
+## Coolify 배포
+
+프런트엔드는 저장소의 `Dockerfile`로 배포한다.
+
+- Build Pack: `Dockerfile`
+- Dockerfile Location: `/Dockerfile`
+- Ports Exposes: `80`
+- Environment Variable:
+
+```env
+BRAND_API_BASE_URL=https://landing-api.ynana.xyz/api
+```
+
+컨테이너가 시작될 때 환경변수 값으로 `runtime-config.js`를 생성한다.
 
 ## 브랜드 연결 범위
 

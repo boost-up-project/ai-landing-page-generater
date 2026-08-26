@@ -2,13 +2,17 @@
   const metaBaseUrl = document
     .querySelector('meta[name="api-base-url"]')
     ?.getAttribute("content");
-  const baseUrl = (
-    window.BRAND_API_BASE_URL
-    || metaBaseUrl
-    || "http://127.0.0.1:8000/api"
-  ).replace(/\/$/, "");
+
+  const configuredBaseUrl = window.BRAND_API_BASE_URL || metaBaseUrl;
+  const baseUrl = configuredBaseUrl?.replace(/\/$/, "");
 
   async function request(path, options = {}) {
+    if (!baseUrl) {
+      throw new Error(
+        "BRAND_API_BASE_URL 환경변수가 설정되지 않았습니다.",
+      );
+    }
+
     let response;
     try {
       response = await fetch(`${baseUrl}${path}`, options);

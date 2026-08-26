@@ -1,0 +1,1 @@
+window.BRAND_API_BASE_URL = "${BRAND_API_BASE_URL}";
