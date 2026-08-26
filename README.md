@@ -31,6 +31,7 @@ window.BRAND_API_BASE_URL = "http://127.0.0.1:8000/api";
 - Build Pack: `Dockerfile`
 - Dockerfile Location: `/Dockerfile`
 - Ports Exposes: `80`
+- Domain: `https://blanki.ynana.xyz`
 - Environment Variable:
 
 ```env
@@ -38,6 +39,7 @@ BRAND_API_BASE_URL=https://landing-api.ynana.xyz/api
 ```
 
 컨테이너가 시작될 때 환경변수 값으로 `runtime-config.js`를 생성한다.
+백엔드의 `CORS_ORIGINS`에도 `https://blanki.ynana.xyz`가 포함되어야 한다.
 
 ## 브랜드 연결 범위
 
