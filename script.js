@@ -9,11 +9,54 @@ const screens = [
   "campaign-check",
 ];
 
-const visualFiles = [
-  { label: "Logo", file: "logo_IKEA.pdf" },
-  { label: "Icon", file: "icon_IKEA.pdf" },
-  { label: "Typography", file: "typography_IKEA.pdf" },
+const brandUploadFields = [
+  { key: "brand_identity", title: "Brand Identity" },
+  { key: "verbal_guideline", title: "Verbal Guideline" },
+  { key: "logo", title: "Logo" },
+  { key: "icon", title: "Icon" },
+  { key: "fonts", title: "Typography" },
 ];
+
+const brandReviewFields = {
+  brand_identity: {
+    title: "Brand Identity",
+    fields: [
+      ["brand_overview", "Brand Overview"],
+      ["brand_philosophy", "Brand Philosophy"],
+      ["brand_positioning", "Brand Positioning"],
+      ["brand_target", "Brand Target"],
+      ["brand_personality", "Brand Personality"],
+    ],
+  },
+  verbal_guideline: {
+    title: "Verbal Guideline",
+    fields: [
+      ["brand_voice", "Brand Voice"],
+      ["tone_of_voice", "Tone of Voice"],
+      ["writing_style", "Writing Style"],
+      ["messaging_principles", "Messaging Principles"],
+      ["vocabulary_and_expressions", "Vocabulary & Expressions"],
+      ["copy_rules", "Copy Rules"],
+    ],
+  },
+  visual_guideline: {
+    title: "Visual Guideline",
+    fields: [
+      ["logo", "Logo"],
+      ["icon", "Icon"],
+      ["color", "Color"],
+      ["fonts", "Fonts"],
+    ],
+  },
+};
+
+const brandState = {
+  files: Object.fromEntries(brandUploadFields.map(({ key }) => [key, []])),
+  analysis: null,
+  markdown: "",
+  error: "",
+  notice: "",
+};
 
 const app = document.querySelector("#app");
 const navigation = document.querySelector("#pageNavigation");
@@ -22,6 +65,15 @@ const nextButton = document.querySelector("#nextButton");
 
 let currentIndex = getIndexFromHash();
 let loadingTimer;
+
+function escapeHTML(value = "") {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
 
 function getIndexFromHash() {
   const slug = window.location.hash.replace(/^#\/?/, "");
@@ -32,13 +84,11 @@ function getIndexFromHash() {
 function routeTo(index) {
   const safeIndex = Math.max(0, Math.min(screens.length - 1, index));
   const nextHash = `#${screens[safeIndex]}`;
-
   if (window.location.hash === nextHash) {
     currentIndex = safeIndex;
     render();
     return;
   }
-
   window.location.hash = nextHash;
 }
 
@@ -47,16 +97,18 @@ function progressMarkup(progress) {
     <div class="progress" aria-label="5단계 중 진행 상태">
       <span class="progress__label">Step 1/5</span>
       <div class="progress__track" aria-hidden="true">
-        ${progress
-          .map(
-            (value) => `
-              <span class="progress__segment">
-                <span class="progress__value" style="width:${value * 100}%"></span>
-              </span>`,
-          )
-          .join("")}
+        ${progress.map((value) => `
+          <span class="progress__segment">
+            <span class="progress__value" style="width:${value * 100}%"></span>
+          </span>`).join("")}
       </div>
     </div>`;
+}
+
+function brandWorkspaceLabel() {
+  const sourceName = brandState.analysis?.source_files?.[0]
+    || allBrandFiles()[0]?.name;
+  return sourceName ? sourceName.replace(/\.pdf$/i, "") : "New Brand";
 }
 
 function headerMarkup(title, description, progress) {
@@ -65,7 +117,7 @@ function headerMarkup(title, description, progress) {
       ${progressMarkup(progress)}
       <div class="heading-block">
         <div class="heading-block__titles">
-          <p class="brand-name">IKEA</p>
+          <p class="brand-name">${escapeHTML(brandWorkspaceLabel())}</p>
           <h1>${title}</h1>
         </div>
         <p class="heading-block__description">${description}</p>
@@ -73,24 +125,50 @@ function headerMarkup(title, description, progress) {
     </header>`;
 }
 
-function emptyFileInput(caption = "어떤 파일을 넣어야 하는지에 대한 설명 (파일 형식, 파일 관련 도움말)") {
+function feedbackMarkup() {
+  if (brandState.error) {
+    return `<div class="api-feedback api-feedback--error" role="alert">${escapeHTML(brandState.error)}</div>`;
+  }
+  if (brandState.notice) {
+    return `<div class="api-feedback api-feedback--success" role="status">${escapeHTML(brandState.notice)}</div>`;
+  }
+  return "";
+}
+
+function emptyFileInput(
+  caption = "브랜드 정보를 확인할 수 있는 PDF 파일을 첨부해 주세요.",
+  group = "",
+) {
+  const groupAttribute = group ? `data-brand-group="${group}"` : "";
   return `
     <label class="file-input">
       <span class="file-input__control">
         <img src="assets/file.svg" alt="" />
-        <span class="file-input__placeholder">파일을 첨부하세요.</span>
+        <span class="file-input__placeholder">PDF 파일을 첨부하세요.</span>
       </span>
       <span class="field-caption">${caption}</span>
-      <input type="file" data-file-input />
+      <input type="file" accept="application/pdf,.pdf" multiple data-file-input ${groupAttribute} />
     </label>`;
 }
 
-function fileRow(name, state = "completed", validation = "") {
+function formatFileSize(size) {
+  if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))}KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)}MB`;
+}
+
+function fileRow(name, options = {}) {
+  const {
+    state = "completed",
+    validation = "",
+    size = "",
+    group = "",
+    index = -1,
+  } = options;
   const stateIcon = state === "uploading"
     ? '<img class="file-row__action file-row__spinner" src="assets/spinner.svg" alt="업로드 중" />'
-    : '<button class="icon-button" type="button" data-remove-file aria-label="파일 삭제"><img src="assets/cancel.svg" alt="" /></button>';
+    : `<button class="icon-button" type="button" data-remove-file data-brand-group="${group}" data-file-index="${index}" aria-label="파일 삭제"><img src="assets/cancel.svg" alt="" /></button>`;
   const validationMarkup = validation
-    ? `<span class="validation validation--${validation}"><img src="assets/validation-${validation}.svg" alt="" />Validation message</span>`
+    ? `<span class="validation validation--${validation}"><img src="assets/validation-${validation}.svg" alt="" />업로드 준비 완료</span>`
     : "";
 
   return `
@@ -98,21 +176,25 @@ function fileRow(name, state = "completed", validation = "") {
       <div class="file-row ${state === "error" ? "file-row--error" : ""}">
         <img class="file-row__icon" src="assets/file-bold.svg" alt="" />
         <span class="file-row__body">
-          <strong>${name}</strong>
-          <small>16MB</small>
+          <strong>${escapeHTML(name)}</strong>
+          ${size ? `<small>${escapeHTML(size)}</small>` : ""}
         </span>
         ${stateIcon}
       </div>
-      ${state === "error" ? '<span class="validation validation--red"><img src="assets/validation-red.svg" alt="" />Validation message</span>' : validationMarkup}
+      ${state === "error" ? '<span class="validation validation--red"><img src="assets/validation-red.svg" alt="" />PDF 파일만 업로드할 수 있습니다.</span>' : validationMarkup}
     </div>`;
 }
 
-function addFileButton() {
+function addFileButton(group = "") {
   return `
-    <button class="add-file-button" type="button" data-add-file>
+    <button class="add-file-button" type="button" data-add-file data-brand-group="${group}">
       <img src="assets/add-file.svg" alt="" />
       <span>파일 추가</span>
     </button>`;
+}
+
+function hiddenFileInput(group) {
+  return `<input class="visually-hidden" type="file" accept="application/pdf,.pdf" multiple data-file-input data-brand-group="${group}" />`;
 }
 
 function colorInput() {
@@ -125,29 +207,38 @@ function colorInput() {
     </div>`;
 }
 
+function brandFilesMarkup(group) {
+  const files = brandState.files[group];
+  if (!files.length) return emptyFileInput(undefined, group);
+  return `
+    ${files.map((file, index) => fileRow(file.name, {
+      validation: "blue",
+      size: formatFileSize(file.size),
+      group,
+      index,
+    })).join("")}
+    ${addFileButton(group)}
+    ${hiddenFileInput(group)}`;
+}
+
 function brandInputMarkup(isUploaded) {
-  const brandIdentity = isUploaded
-    ? `${fileRow("Brand Identity_IKEA.pdf", "completed", "blue")}${addFileButton()}`
-    : emptyFileInput();
-  const verbal = isUploaded
-    ? `${fileRow("Verbal Guideline(1)_IKEA.pdf", "uploading")}${fileRow("Verbal Guideline(2)_IKEA.pdf", "error")}${addFileButton()}`
-    : emptyFileInput();
-  const visual = visualFiles
-    .map(
-      (item) => `
-        <li class="visual-field">
-          <span class="visual-field__name">${item.label}</span>
-          ${isUploaded ? `${fileRow(item.file, "completed", "blue")}${addFileButton()}` : emptyFileInput()}
-        </li>`,
-    )
-    .join("");
+  const visual = [
+    ["Logo", "logo"],
+    ["Icon", "icon"],
+    ["Typography", "fonts"],
+  ].map(([label, key]) => `
+      <li class="visual-field">
+        <span class="visual-field__name">${label}</span>
+        ${brandFilesMarkup(key)}
+      </li>`).join("");
 
   return `
     <div class="screen-content">
-      ${headerMarkup("Brand Knowledge Input", "브랜드 정보를 입력 어쩌구저쩌구 해주세요.", [0.5, 0, 0, 0, 0])}
-      <form class="input-form ${isUploaded ? "input-form--uploaded" : ""}">
-        <section class="file-section"><h2>Brand Identity</h2><div class="file-section__body">${brandIdentity}</div></section>
-        <section class="file-section"><h2>Verbal Guideline</h2><div class="file-section__body">${verbal}</div></section>
+      ${headerMarkup("Brand Knowledge Input", "브랜드 가이드 PDF를 업로드하면 AI가 검토 가능한 항목으로 정리합니다.", [0.5, 0, 0, 0, 0])}
+      ${feedbackMarkup()}
+      <form class="input-form ${isUploaded ? "input-form--uploaded" : ""}" onsubmit="return false">
+        <section class="file-section"><h2>Brand Identity</h2><div class="file-section__body">${brandFilesMarkup("brand_identity")}</div></section>
+        <section class="file-section"><h2>Verbal Guideline</h2><div class="file-section__body">${brandFilesMarkup("verbal_guideline")}</div></section>
         <section class="file-section file-section--visual">
           <h2>Visual Identity</h2>
           <ol class="visual-fields">
@@ -155,7 +246,7 @@ function brandInputMarkup(isUploaded) {
             <li class="visual-field">
               <span class="visual-field__name">Color</span>
               ${colorInput()}
-              <span class="field-caption">브랜드명, 브랜드철학, 포지셔닝, 코어벨류 등 자세할 수록 좋아요.</span>
+              <span class="field-caption">색상은 PDF 분석 결과에서 확인하고 검토 단계에서 수정할 수 있습니다.</span>
             </li>
           </ol>
         </section>
@@ -163,81 +254,95 @@ function brandInputMarkup(isUploaded) {
     </div>`;
 }
 
+function allBrandFiles() {
+  return Object.values(brandState.files).flat();
+}
+
 function loadingMarkup(type) {
-  const isBrand = type === "brand";
-  const rows = isBrand
-    ? [
-        ["done", "읽기 완료 · Brand Identity_IKEA.pdf"],
-        ["done", "읽기 완료 · Brand Identity_IKEA.pdf"],
-        ["loading", "문서 읽는 중 · Verbal Guideline(2)_IKEA.pdf"],
-        ["waiting", "대기 중 · logo_IKEA.pdf"],
-        ["waiting", "대기 중 · logo_IKEA.pdf"],
-        ["waiting", "대기 중 · logo_IKEA.pdf"],
-        ["waiting", "대기 중 · logo_IKEA.pdf"],
-        ["waiting", "대기 중 · logo_IKEA.pdf"],
-      ]
+  const brandRows = allBrandFiles().map((file, index) => [
+    index === 0 ? "loading" : "waiting",
+    `${index === 0 ? "문서 읽는 중" : "대기 중"} · ${file.name}`,
+  ]);
+  const rows = type === "brand" && brandRows.length
+    ? brandRows
     : [
-        ["done", "읽기 완료 · Brand Identity_IKEA.pdf"],
-        ["done", "읽기 완료 · Brand Identity_IKEA.pdf"],
-        ["loading", "문서 읽는 중 · Verbal Guideline(2)_IKEA.pdf"],
+        ["done", "읽기 완료 · Campaign Knowledge_IKEA.pdf"],
+        ["loading", "문서 읽는 중 · Component Structure_IKEA.pdf"],
+        ["waiting", "대기 중 · Product Library_IKEA.pdf"],
       ];
-  const rowMarkup = rows
-    .map(([state, text]) => {
-      const icon = state === "done" ? "status-check.svg" : state === "loading" ? "spinner.svg" : "status-dot.svg";
-      return `<li class="loading-row loading-row--${state}"><img src="assets/${icon}" alt="" /><span>${text}</span></li>`;
-    })
-    .join("");
+  const rowMarkup = rows.map(([state, text]) => {
+    const icon = state === "done" ? "status-check.svg" : state === "loading" ? "spinner.svg" : "status-dot.svg";
+    return `<li class="loading-row loading-row--${state}"><img src="assets/${icon}" alt="" /><span>${escapeHTML(text)}</span></li>`;
+  }).join("");
 
   return `
     <section class="loading-screen" aria-live="polite">
       <div class="loading-card">
-        <div class="loading-card__header"><h1>AI가 문서를 읽고 있어요</h1><p>보통 10초 안에 끝나요</p></div>
+        <div class="loading-card__header"><h1>AI가 문서를 읽고 있어요</h1><p>PDF 분량에 따라 시간이 걸릴 수 있어요.</p></div>
         <div class="loading-card__body"><ul class="loading-list">${rowMarkup}</ul><div class="loading-progress"><span></span></div></div>
       </div>
     </section>`;
 }
 
-function chipMarkup(name = "Brand Identity_IKEA.pdf") {
+function chipMarkup(name = "Brand Identity_IKEA.pdf", removable = false) {
   return `
     <span class="file-chip">
-      <span><img src="assets/chip-file.svg" alt="" />${name}</span>
-      <button type="button" data-remove-chip aria-label="첨부 파일 삭제"><img src="assets/chip-cancel.svg" alt="" /></button>
+      <span><img src="assets/chip-file.svg" alt="" />${escapeHTML(name)}</span>
+      ${removable ? '<button type="button" data-remove-chip aria-label="첨부 파일 삭제"><img src="assets/chip-cancel.svg" alt="" /></button>' : ""}
     </span>`;
 }
 
 function reviewItem(index, options = {}) {
-  const chips = options.chips ? `<div class="inline-chips">${chipMarkup()}</div>` : "";
-  const invalid = options.invalid ? '<span class="validation validation--red"><img src="assets/validation-red.svg" alt="" />Validation message</span>' : "";
+  const {
+    title = "소제목",
+    content = "정리된 내용",
+    references = [],
+    path = "",
+  } = options;
+  const chips = references.length
+    ? `<div class="inline-chips">${references.map((reference) => chipMarkup(`${reference.filename} · p.${reference.page}`)).join("")}</div>`
+    : '<span class="field-caption">PDF에서 확인된 출처가 없습니다.</span>';
   return `
     <div class="review-item">
       <div class="review-item__header">
-        <span>${index}. 소제목</span>
+        <span>${index}. ${escapeHTML(title)}</span>
         <span class="review-item__actions">
-          <button class="refresh-button" type="button" data-refresh><img src="assets/refresh.svg" alt="" /><span>다시정리</span></button>
-          <button class="remove-item-button" type="button" data-remove-item aria-label="항목 삭제"><img src="assets/circle-x.svg" alt="" /></button>
+          <button class="refresh-button" type="button" data-refresh><img src="assets/refresh.svg" alt="" /><span>원문 복원</span></button>
         </span>
       </div>
       ${chips}
       <div class="textarea-wrap">
-        <textarea class="review-textarea ${options.focused ? "review-textarea--focused" : ""}">정리된 내용</textarea>
+        <textarea class="review-textarea" data-brand-path="${path}" data-original-value="${escapeHTML(content)}">${escapeHTML(content)}</textarea>
         <img class="textarea-grip" src="assets/grip.svg" alt="" />
       </div>
-      ${invalid}
     </div>`;
 }
 
-function reviewSection(title, count, options = {}) {
-  const files = options.files === false ? "" : `<div class="section-files">${Array.from({ length: options.fileCount || 5 }, () => chipMarkup()).join("")}</div>`;
-  const items = Array.from({ length: count }, (_, index) => reviewItem(index + 1, {
-    focused: options.focused === index,
-    invalid: options.invalid === index,
-    chips: options.itemChips?.includes(index),
-  })).join("");
-  return `
-    <section class="review-section">
-      <div class="review-section__title"><h2>${title}</h2>${files}</div>
-      <div class="review-section__items">${items}</div>
-    </section>`;
+function actualBrandReviewMarkup() {
+  if (!brandState.analysis?.data) {
+    return '<div class="api-feedback api-feedback--error" role="alert">분석 결과를 찾을 수 없습니다. PDF를 다시 업로드해 주세요.</div>';
+  }
+  return Object.entries(brandReviewFields).map(([groupKey, group]) => {
+    const items = group.fields.map(([fieldKey, label], index) => {
+      const section = brandState.analysis.data[groupKey][fieldKey];
+      return reviewItem(index + 1, {
+        title: label,
+        content: section.content,
+        references: section.source_references,
+        path: `${groupKey}.${fieldKey}`,
+      });
+    }).join("");
+    return `
+      <section class="review-section">
+        <div class="review-section__title"><h2>${group.title}</h2></div>
+        <div class="review-section__items">${items}</div>
+      </section>`;
+  }).join("");
+}
+
+function sampleReviewSection(title, count) {
+  const items = Array.from({ length: count }, (_, index) => reviewItem(index + 1)).join("");
+  return `<section class="review-section"><div class="review-section__title"><h2>${title}</h2></div><div class="review-section__items">${items}</div></section>`;
 }
 
 function checkMarkup(type) {
@@ -245,21 +350,17 @@ function checkMarkup(type) {
   const title = isBrand ? "Brand Knowledge Check" : "Campaign Knowledge Check";
   const progress = isBrand ? [1, 0, 0, 0, 0] : [1, 1, 0, 0, 0];
   const sections = isBrand
-    ? [
-        reviewSection("Brand Identity", 4, { focused: 1, invalid: 3 }),
-        reviewSection("Verbal Guideline", 3),
-        reviewSection("Visual Identity", 3, { files: false, invalid: 1, itemChips: [0, 1, 2] }),
-        `<section class="review-section review-section--color"><div class="numbered-color"><span>4. Color</span>${colorInput()}</div></section>`,
-      ]
+    ? actualBrandReviewMarkup()
     : [
-        reviewSection("Campaign Knowledge", 4, { focused: 1, invalid: 3 }),
-        reviewSection("Component Structure", 1),
-        reviewSection("Product Library", 1),
-      ];
+        sampleReviewSection("Campaign Knowledge", 4),
+        sampleReviewSection("Component Structure", 1),
+        sampleReviewSection("Product Library", 1),
+      ].join("");
   return `
     <div class="screen-content screen-content--review">
-      ${headerMarkup(title, "AI가 분석 및 정리한 정보를 확인해 주세요.", progress)}
-      <div class="review-area">${sections.join("")}</div>
+      ${headerMarkup(title, "AI가 분석한 정보를 확인하고 필요한 내용을 수정해 주세요.", progress)}
+      ${feedbackMarkup()}
+      <div class="review-area">${sections}</div>
     </div>`;
 }
 
@@ -269,16 +370,15 @@ function campaignInputMarkup(isUploaded) {
     { title: "Component Structure", question: true, file: "Component Structure_IKEA.pdf", state: "completed" },
     { title: "Product Library", question: false, file: "Product Library_IKEA.pdf", state: "completed" },
   ];
-  const sectionMarkup = sections
-    .map((section) => `
-      <section class="file-section">
-        <div class="file-section__heading"><h2>${section.title}</h2>${section.question ? '<img class="question-icon" src="assets/question.svg" alt="도움말" />' : ""}</div>
-        <div class="file-section__body">${isUploaded ? `${fileRow(section.file, section.state, section.state === "completed" ? "blue" : "")}${addFileButton()}` : emptyFileInput()}</div>
-      </section>`)
-    .join("");
+  const sectionMarkup = sections.map((section) => `
+    <section class="file-section">
+      <div class="file-section__heading"><h2>${section.title}</h2>${section.question ? '<img class="question-icon" src="assets/question.svg" alt="도움말" />' : ""}</div>
+      <div class="file-section__body">${isUploaded ? `${fileRow(section.file, { state: section.state, validation: section.state === "completed" ? "blue" : "" })}${addFileButton()}` : emptyFileInput()}</div>
+    </section>`).join("");
   return `
     <div class="screen-content">
-      ${headerMarkup("Campaign Knowledge Input", "캠페인 정보를 입력 어쩌구저쩌구 해주세요.", [1, 0.5, 0, 0, 0])}
+      ${headerMarkup("Campaign Knowledge Input", "캠페인 정보를 입력해 주세요.", [1, 0.5, 0, 0, 0])}
+      ${feedbackMarkup()}
       <form class="input-form campaign-form ${isUploaded ? "input-form--uploaded" : ""}">${sectionMarkup}</form>
     </div>`;
 }
@@ -301,7 +401,9 @@ function render() {
   app.innerHTML = renderScreen();
   window.scrollTo(0, 0);
   updateNavigation(screen);
-  if (screen.endsWith("-loading")) loadingTimer = window.setTimeout(() => routeTo(currentIndex + 1), 6000);
+  if (screen === "campaign-loading") {
+    loadingTimer = window.setTimeout(() => routeTo(currentIndex + 1), 6000);
+  }
 }
 
 function updateNavigation(screen) {
@@ -309,13 +411,91 @@ function updateNavigation(screen) {
   previousButton.hidden = currentIndex < 2;
   previousButton.disabled = false;
   nextButton.disabled = false;
+  nextButton.querySelector("span").textContent = screen === "brand-check" ? "확정" : "Next";
+}
+
+async function analyzeBrand() {
+  const files = allBrandFiles();
+  if (!files.length) {
+    brandState.error = "분석할 PDF 파일을 한 개 이상 첨부해 주세요.";
+    routeTo(0);
+    return;
+  }
+  if (files.length > 10) {
+    brandState.error = "PDF 파일은 최대 10개까지 첨부할 수 있습니다.";
+    render();
+    return;
+  }
+
+  brandState.error = "";
+  brandState.notice = "";
+  routeTo(2);
+  try {
+    brandState.analysis = await window.BrandAPI.analyze(files);
+    routeTo(3);
+  } catch (error) {
+    brandState.error = error.message;
+    routeTo(1);
+  }
+}
+
+function collectReviewedBrandData() {
+  const data = structuredClone(brandState.analysis.data);
+  document.querySelectorAll("[data-brand-path]").forEach((textarea) => {
+    const [groupKey, fieldKey] = textarea.dataset.brandPath.split(".");
+    data[groupKey][fieldKey].content = textarea.value.trim();
+    if (!data[groupKey][fieldKey].content) {
+      data[groupKey][fieldKey].source_references = [];
+    }
+  });
+  return data;
+}
+
+async function finalizeBrand() {
+  if (!brandState.analysis?.brand_id) {
+    brandState.error = "분석 결과가 없어 확정할 수 없습니다.";
+    render();
+    return;
+  }
+  brandState.error = "";
+  navigation.hidden = true;
+  try {
+    const data = collectReviewedBrandData();
+    brandState.analysis = await window.BrandAPI.review(brandState.analysis.brand_id, data);
+    const finalized = await window.BrandAPI.finalize(brandState.analysis.brand_id);
+    brandState.markdown = finalized.markdown;
+    brandState.notice = "Brand Knowledge 검토가 완료되어 brand.md를 생성했습니다.";
+    routeTo(4);
+  } catch (error) {
+    brandState.error = error.message;
+    render();
+  }
 }
 
 previousButton.addEventListener("click", () => {
   const previousIndex = screens[currentIndex - 1]?.endsWith("-loading") ? currentIndex - 2 : currentIndex - 1;
   routeTo(previousIndex);
 });
-nextButton.addEventListener("click", () => {
+
+nextButton.addEventListener("click", async () => {
+  const screen = screens[currentIndex];
+  if (screen === "brand-input") {
+    if (!allBrandFiles().length) {
+      brandState.error = "분석할 PDF 파일을 한 개 이상 첨부해 주세요.";
+      render();
+      return;
+    }
+    routeTo(1);
+    return;
+  }
+  if (screen === "brand-uploaded") {
+    await analyzeBrand();
+    return;
+  }
+  if (screen === "brand-check") {
+    await finalizeBrand();
+    return;
+  }
   if (currentIndex < screens.length - 1) routeTo(currentIndex + 1);
 });
 
@@ -325,21 +505,64 @@ app.addEventListener("click", (event) => {
   const removeItem = event.target.closest("[data-remove-item]");
   const refresh = event.target.closest("[data-refresh]");
   const addFile = event.target.closest("[data-add-file]");
-  if (removeFile) removeFile.closest(".completed-file-wrap")?.remove();
+
+  if (removeFile) {
+    const group = removeFile.dataset.brandGroup;
+    const index = Number(removeFile.dataset.fileIndex);
+    if (group && Number.isInteger(index) && index >= 0) {
+      brandState.files[group].splice(index, 1);
+      brandState.error = "";
+      render();
+    } else {
+      removeFile.closest(".completed-file-wrap")?.remove();
+    }
+  }
   if (removeChip) removeChip.closest(".file-chip")?.remove();
   if (removeItem) removeItem.closest(".review-item")?.remove();
   if (refresh) {
     const textarea = refresh.closest(".review-item")?.querySelector("textarea");
-    if (textarea) textarea.value = "정리된 내용";
+    if (textarea) textarea.value = textarea.dataset.originalValue || "";
   }
-  if (addFile) addFile.closest(".file-section__body")?.querySelector("input[type='file']")?.click();
+  if (addFile) {
+    const group = addFile.dataset.brandGroup;
+    const selector = group
+      ? `[data-file-input][data-brand-group="${group}"]`
+      : "input[type='file']";
+    addFile.closest(".file-section__body")?.querySelector(selector)?.click();
+  }
 });
 
 app.addEventListener("change", (event) => {
   const input = event.target.closest("[data-file-input]");
   if (!input?.files?.length) return;
-  const placeholder = input.closest(".file-input")?.querySelector(".file-input__placeholder");
-  if (placeholder) placeholder.textContent = input.files[0].name;
+  const group = input.dataset.brandGroup;
+  if (!group) {
+    const placeholder = input.closest(".file-input")?.querySelector(".file-input__placeholder");
+    if (placeholder) placeholder.textContent = input.files[0].name;
+    return;
+  }
+
+  const selectedFiles = Array.from(input.files);
+  const invalidFile = selectedFiles.find((file) => !file.name.toLowerCase().endsWith(".pdf"));
+  const oversizedFile = selectedFiles.find((file) => file.size > 20 * 1024 * 1024);
+  if (invalidFile) {
+    brandState.error = `${invalidFile.name}: PDF 파일만 첨부할 수 있습니다.`;
+    render();
+    return;
+  }
+  if (oversizedFile) {
+    brandState.error = `${oversizedFile.name}: 파일 크기는 20MB 이하여야 합니다.`;
+    render();
+    return;
+  }
+
+  brandState.files[group].push(...selectedFiles);
+  brandState.error = "";
+  routeTo(1);
+});
+
+app.addEventListener("input", (event) => {
+  if (event.target.matches("[data-brand-path]")) brandState.error = "";
 });
 
 window.addEventListener("hashchange", () => {
