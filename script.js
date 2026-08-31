@@ -90,10 +90,67 @@ const brandReviewFields = {
   },
 };
 
+const campaignUploadFields = [
+  {
+    key: "strategy",
+    title: "Campaign Strategy",
+    accept: "application/pdf,.pdf",
+    extensions: [".pdf"],
+    placeholder: "캠페인 전략 PDF 1개를 첨부하세요.",
+    caption: "캠페인 배경, 목표, 아이디어와 CTA가 포함된 PDF를 첨부해 주세요.",
+    formatLabel: "PDF",
+    multiple: false,
+    maxFiles: 1,
+    maxSize: 20 * 1024 * 1024,
+  },
+  {
+    key: "components",
+    title: "Web Components",
+    accept: "text/html,.html,.htm",
+    extensions: [".html", ".htm"],
+    placeholder: "HTML 웹 컴포넌트를 첨부하세요.",
+    caption: "저장할 HTML 웹 컴포넌트를 여러 개 첨부할 수 있습니다.",
+    formatLabel: "HTML",
+    multiple: true,
+    maxFiles: 20,
+    maxSize: 5 * 1024 * 1024,
+  },
+  {
+    key: "assets",
+    title: "Image Assets",
+    accept: "image/png,image/jpeg,image/gif,image/webp,.png,.jpg,.jpeg,.gif,.webp",
+    extensions: [".png", ".jpg", ".jpeg", ".gif", ".webp"],
+    placeholder: "이미지 파일을 첨부하세요.",
+    caption: "PNG, JPG, JPEG, GIF 또는 WEBP 이미지를 여러 개 첨부할 수 있습니다.",
+    formatLabel: "PNG, JPG, JPEG, GIF, WEBP",
+    multiple: true,
+    maxFiles: 50,
+    maxSize: 20 * 1024 * 1024,
+  },
+];
+
+const campaignReviewFields = [
+  ["campaign_overview", "Campaign Overview"],
+  ["objective", "Objective"],
+  ["campaign_opportunity", "Campaign Opportunity"],
+  ["audience_insight", "Audience Insight"],
+  ["campaign_idea", "Campaign Idea"],
+  ["offering", "Offering"],
+  ["communication_strategy", "Communication Strategy"],
+  ["cta_map", "CTA Map"],
+];
+
 const brandState = {
   files: Object.fromEntries(brandUploadFields.map(({ key }) => [key, []])),
   colors: [],
   colorDraft: "",
+  analysis: null,
+  markdown: "",
+  error: "",
+  notice: "",
+};
+const campaignState = {
+  files: Object.fromEntries(campaignUploadFields.map(({ key }) => [key, []])),
   analysis: null,
   markdown: "",
   error: "",
@@ -156,13 +213,22 @@ function brandWorkspaceLabel() {
     : "New Brand";
 }
 
+function workspaceLabel() {
+  if (currentIndex >= screens.indexOf("campaign-input")) {
+    const sourceName = campaignState.analysis?.source_file
+      || campaignState.files.strategy[0]?.name;
+    return sourceName ? sourceName.replace(/\.pdf$/i, "") : "New Campaign";
+  }
+  return brandWorkspaceLabel();
+}
+
 function headerMarkup(title, description, progress) {
   return `
     <header class="page-header">
       ${progressMarkup(progress)}
       <div class="heading-block">
         <div class="heading-block__titles">
-          <p class="brand-name">${escapeHTML(brandWorkspaceLabel())}</p>
+          <p class="brand-name">${escapeHTML(workspaceLabel())}</p>
           <h1>${title}</h1>
         </div>
         <p class="heading-block__description">${description}</p>
@@ -171,11 +237,14 @@ function headerMarkup(title, description, progress) {
 }
 
 function feedbackMarkup() {
-  if (brandState.error) {
-    return `<div class="api-feedback api-feedback--error" role="alert">${escapeHTML(brandState.error)}</div>`;
+  const state = currentIndex >= screens.indexOf("campaign-input")
+    ? campaignState
+    : brandState;
+  if (state.error) {
+    return `<div class="api-feedback api-feedback--error" role="alert">${escapeHTML(state.error)}</div>`;
   }
-  if (brandState.notice) {
-    return `<div class="api-feedback api-feedback--success" role="status">${escapeHTML(brandState.notice)}</div>`;
+  if (state.notice) {
+    return `<div class="api-feedback api-feedback--success" role="status">${escapeHTML(state.notice)}</div>`;
   }
   return "";
 }
@@ -357,13 +426,11 @@ function loadingMarkup(type) {
   if (type === "brand" && brandState.colors.length) {
     brandRows.push(["waiting", `색상 정리 중 · ${brandState.colors.join(", ")}`]);
   }
-  const rows = type === "brand" && brandRows.length
-    ? brandRows
-    : [
-        ["done", "읽기 완료 · Campaign Knowledge_IKEA.pdf"],
-        ["loading", "문서 읽는 중 · Component Structure_IKEA.pdf"],
-        ["waiting", "대기 중 · Product Library_IKEA.pdf"],
-      ];
+  const campaignRows = Object.values(campaignState.files).flat().map((file, index) => [
+    index === 0 ? "loading" : "waiting",
+    `${index === 0 ? "PDF 분석 중" : "저장 대기 중"} · ${file.name}`,
+  ]);
+  const rows = type === "brand" ? brandRows : campaignRows;
   const rowMarkup = rows.map(([state, text]) => {
     const icon = state === "done" ? "status-check.svg" : state === "loading" ? "spinner.svg" : "status-dot.svg";
     return `<li class="loading-row loading-row--${state}"><img src="assets/${icon}" alt="" /><span>${escapeHTML(text)}</span></li>`;
@@ -434,6 +501,7 @@ function reviewItem(index, options = {}) {
     references = [],
     path = "",
     assetGroup = "",
+    pathAttribute = "data-brand-path",
   } = options;
   const directAssets = assetGroup ? brandState.files[assetGroup] : [];
   const chips = references.length
@@ -455,7 +523,7 @@ function reviewItem(index, options = {}) {
       ${assetPreview}
       ${colorPalette}
       <div class="textarea-wrap">
-        <textarea class="review-textarea" data-brand-path="${path}" data-original-value="${escapeHTML(content)}">${escapeHTML(content)}</textarea>
+        <textarea class="review-textarea" ${pathAttribute}="${path}" data-original-value="${escapeHTML(content)}">${escapeHTML(content)}</textarea>
         <img class="textarea-grip" src="assets/grip.svg" alt="" />
       </div>
     </div>`;
@@ -491,17 +559,34 @@ function sampleReviewSection(title, count) {
   return `<section class="review-section"><div class="review-section__title"><h2>${title}</h2></div><div class="review-section__items">${items}</div></section>`;
 }
 
+function actualCampaignReviewMarkup() {
+  if (!campaignState.analysis?.data) {
+    return '<div class="api-feedback api-feedback--error" role="alert">분석 결과를 찾을 수 없습니다. PDF를 다시 업로드해 주세요.</div>';
+  }
+  const items = campaignReviewFields.map(([fieldKey, label], index) => {
+    const section = campaignState.analysis.data[fieldKey];
+    return reviewItem(index + 1, {
+      title: label,
+      content: section.content,
+      references: section.source_references,
+      path: fieldKey,
+      pathAttribute: "data-campaign-path",
+    });
+  }).join("");
+  return `
+    <section class="review-section">
+      <div class="review-section__title"><h2>Campaign Knowledge</h2></div>
+      <div class="review-section__items">${items}</div>
+    </section>`;
+}
+
 function checkMarkup(type) {
   const isBrand = type === "brand";
   const title = isBrand ? "Brand Knowledge Check" : "Campaign Knowledge Check";
   const progress = isBrand ? [1, 0, 0, 0, 0] : [1, 1, 0, 0, 0];
   const sections = isBrand
     ? actualBrandReviewMarkup()
-    : [
-        sampleReviewSection("Campaign Knowledge", 4),
-        sampleReviewSection("Component Structure", 1),
-        sampleReviewSection("Product Library", 1),
-      ].join("");
+    : actualCampaignReviewMarkup();
   return `
     <div class="screen-content screen-content--review">
       ${headerMarkup(title, "AI가 분석한 정보를 확인하고 필요한 내용을 수정해 주세요.", progress)}
@@ -511,15 +596,10 @@ function checkMarkup(type) {
 }
 
 function campaignInputMarkup(isUploaded) {
-  const sections = [
-    { title: "Campaign Knowledge", question: false, file: "Campaign Knowledge_IKEA.pdf", state: "uploading" },
-    { title: "Component Structure", question: true, file: "Component Structure_IKEA.pdf", state: "completed" },
-    { title: "Product Library", question: false, file: "Product Library_IKEA.pdf", state: "completed" },
-  ];
-  const sectionMarkup = sections.map((section) => `
+  const sectionMarkup = campaignUploadFields.map((field) => `
     <section class="file-section">
-      <div class="file-section__heading"><h2>${section.title}</h2>${section.question ? '<img class="question-icon" src="assets/question.svg" alt="도움말" />' : ""}</div>
-      <div class="file-section__body">${isUploaded ? `${fileRow(section.file, { state: section.state, validation: section.state === "completed" ? "blue" : "" })}${addFileButton()}` : emptyFileInput()}</div>
+      <div class="file-section__heading"><h2>${field.title}</h2></div>
+      <div class="file-section__body">${campaignFilesMarkup(field, isUploaded)}</div>
     </section>`).join("");
   return `
     <div class="screen-content">
@@ -527,6 +607,29 @@ function campaignInputMarkup(isUploaded) {
       ${feedbackMarkup()}
       <form class="input-form campaign-form ${isUploaded ? "input-form--uploaded" : ""}">${sectionMarkup}</form>
     </div>`;
+}
+
+function campaignFilesMarkup(field, isUploaded) {
+  const files = campaignState.files[field.key];
+  const rows = files.map((file, index) => `
+    <div class="completed-file-wrap">
+      <div class="file-row">
+        <img class="file-row__icon" src="assets/file-bold.svg" alt="" />
+        <span class="file-row__body"><strong>${escapeHTML(file.name)}</strong><small>${formatFileSize(file.size)}</small></span>
+        <button class="icon-button" type="button" data-remove-campaign-file data-campaign-group="${field.key}" data-file-index="${index}" aria-label="파일 삭제"><img src="assets/cancel.svg" alt="" /></button>
+      </div>
+      <span class="validation validation--blue"><img src="assets/validation-blue.svg" alt="" />업로드 준비 완료</span>
+    </div>`).join("");
+  const input = `
+    <label class="file-input ${files.length ? "visually-hidden" : ""}">
+      <span class="file-input__control"><img src="assets/file.svg" alt="" /><span class="file-input__placeholder">${field.placeholder}</span></span>
+      <span class="field-caption">${field.caption}</span>
+      <input type="file" accept="${field.accept}" ${field.multiple ? "multiple" : ""} data-campaign-file-input data-campaign-group="${field.key}" />
+    </label>`;
+  const addButton = files.length && (field.multiple || !files.length)
+    ? `<button class="add-file-button" type="button" data-add-campaign-file data-campaign-group="${field.key}"><img src="assets/add-file.svg" alt="" /><span>파일 추가</span></button>`
+    : "";
+  return `${rows}${input}${isUploaded ? addButton : ""}`;
 }
 
 function render() {
@@ -547,9 +650,6 @@ function render() {
   app.innerHTML = renderScreen();
   window.scrollTo(0, 0);
   updateNavigation(screen);
-  if (screen === "campaign-loading") {
-    loadingTimer = window.setTimeout(() => routeTo(currentIndex + 1), 6000);
-  }
 }
 
 function updateNavigation(screen) {
@@ -557,7 +657,7 @@ function updateNavigation(screen) {
   previousButton.hidden = currentIndex < 2;
   previousButton.disabled = false;
   nextButton.disabled = false;
-  nextButton.querySelector("span").textContent = screen === "brand-check" ? "확정" : "Next";
+  nextButton.querySelector("span").textContent = screen.endsWith("-check") ? "확정" : "Next";
 }
 
 async function analyzeBrand() {
@@ -630,6 +730,65 @@ async function finalizeBrand() {
   }
 }
 
+async function analyzeCampaign() {
+  const strategyFile = campaignState.files.strategy[0];
+  if (!strategyFile) {
+    campaignState.error = "캠페인 전략 PDF 1개를 첨부해 주세요.";
+    routeTo(4);
+    return;
+  }
+  campaignState.error = "";
+  campaignState.notice = "";
+  routeTo(6);
+  try {
+    campaignState.analysis = await window.CampaignAPI.analyze({
+      strategyFile,
+      componentFiles: campaignState.files.components,
+      assetFiles: campaignState.files.assets,
+    });
+    routeTo(7);
+  } catch (error) {
+    campaignState.error = error.message;
+    routeTo(5);
+  }
+}
+
+function collectReviewedCampaignData() {
+  const data = structuredClone(campaignState.analysis.data);
+  document.querySelectorAll("[data-campaign-path]").forEach((textarea) => {
+    const fieldKey = textarea.dataset.campaignPath;
+    data[fieldKey].content = textarea.value.trim();
+    if (!data[fieldKey].content) data[fieldKey].source_references = [];
+  });
+  return data;
+}
+
+async function finalizeCampaign() {
+  if (!campaignState.analysis?.campaign_id) {
+    campaignState.error = "분석 결과가 없어 확정할 수 없습니다.";
+    render();
+    return;
+  }
+  campaignState.error = "";
+  navigation.hidden = true;
+  try {
+    const data = collectReviewedCampaignData();
+    campaignState.analysis = await window.CampaignAPI.review(
+      campaignState.analysis.campaign_id,
+      data,
+    );
+    const finalized = await window.CampaignAPI.finalize(
+      campaignState.analysis.campaign_id,
+    );
+    campaignState.markdown = finalized.markdown;
+    campaignState.notice = "Campaign Knowledge 검토가 완료되어 campaign.md를 생성했습니다.";
+    render();
+  } catch (error) {
+    campaignState.error = error.message;
+    render();
+  }
+}
+
 function normalizeHexColor(value) {
   let hex = value.trim().replace(/^#/, "");
   if (/^[0-9a-fA-F]{3}$/.test(hex)) {
@@ -692,6 +851,23 @@ nextButton.addEventListener("click", async () => {
     await finalizeBrand();
     return;
   }
+  if (screen === "campaign-input") {
+    if (!campaignState.files.strategy.length) {
+      campaignState.error = "캠페인 전략 PDF 1개를 첨부해 주세요.";
+      render();
+      return;
+    }
+    routeTo(5);
+    return;
+  }
+  if (screen === "campaign-uploaded") {
+    await analyzeCampaign();
+    return;
+  }
+  if (screen === "campaign-check") {
+    await finalizeCampaign();
+    return;
+  }
   if (currentIndex < screens.length - 1) routeTo(currentIndex + 1);
 });
 
@@ -704,6 +880,19 @@ app.addEventListener("click", async (event) => {
   const addFile = event.target.closest("[data-add-file]");
   const addColor = event.target.closest("[data-add-color]");
   const eyedropper = event.target.closest("[data-eyedropper]");
+  const removeCampaignFile = event.target.closest("[data-remove-campaign-file]");
+  const addCampaignFile = event.target.closest("[data-add-campaign-file]");
+
+  if (removeCampaignFile) {
+    const group = removeCampaignFile.dataset.campaignGroup;
+    campaignState.files[group].splice(Number(removeCampaignFile.dataset.fileIndex), 1);
+    campaignState.error = "";
+    render();
+  }
+  if (addCampaignFile) {
+    const group = addCampaignFile.dataset.campaignGroup;
+    app.querySelector(`[data-campaign-file-input][data-campaign-group="${group}"]`)?.click();
+  }
 
   if (removeFile) {
     const group = removeFile.dataset.brandGroup;
@@ -744,6 +933,41 @@ app.addEventListener("click", async (event) => {
 });
 
 app.addEventListener("change", (event) => {
+  const campaignInput = event.target.closest("[data-campaign-file-input]");
+  if (campaignInput?.files?.length) {
+    const group = campaignInput.dataset.campaignGroup;
+    const config = campaignUploadFields.find((field) => field.key === group);
+    const selectedFiles = Array.from(campaignInput.files);
+    const invalidFile = selectedFiles.find((file) => !config.extensions.some(
+      (extension) => file.name.toLowerCase().endsWith(extension),
+    ));
+    const oversizedFile = selectedFiles.find((file) => file.size > config.maxSize);
+    const nextCount = config.multiple
+      ? campaignState.files[group].length + selectedFiles.length
+      : selectedFiles.length;
+    if (invalidFile) {
+      campaignState.error = `${invalidFile.name}: ${config.formatLabel} 파일만 첨부할 수 있습니다.`;
+      render();
+      return;
+    }
+    if (oversizedFile) {
+      campaignState.error = `${oversizedFile.name}: 파일 크기 제한을 초과했습니다.`;
+      render();
+      return;
+    }
+    if (nextCount > config.maxFiles) {
+      campaignState.error = `${config.title}: 최대 ${config.maxFiles}개까지 첨부할 수 있습니다.`;
+      render();
+      return;
+    }
+    campaignState.files[group] = config.multiple
+      ? [...campaignState.files[group], ...selectedFiles]
+      : selectedFiles.slice(0, 1);
+    campaignState.error = "";
+    routeTo(5);
+    return;
+  }
+
   const input = event.target.closest("[data-file-input]");
   if (!input?.files?.length) return;
   const group = input.dataset.brandGroup;
@@ -778,6 +1002,7 @@ app.addEventListener("change", (event) => {
 
 app.addEventListener("input", (event) => {
   if (event.target.matches("[data-brand-path]")) brandState.error = "";
+  if (event.target.matches("[data-campaign-path]")) campaignState.error = "";
   if (event.target.matches("[data-color-hex]")) {
     brandState.colorDraft = event.target.value;
     brandState.error = "";

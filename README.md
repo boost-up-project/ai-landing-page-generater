@@ -52,7 +52,16 @@ BRAND_API_BASE_URL=https://landing-api.ynana.xyz/api
 - 분석 내용 수정 및 검토 저장
 - 최종 `brand.md` 생성 요청
 
-캠페인 화면은 현재 UI 초안이며 API와 연결되어 있지 않다.
+## 캠페인 연결 범위
+
+- 캠페인 전략 PDF 1개 업로드 및 분석 요청
+- HTML 웹 컴포넌트 다중 업로드
+- PNG/JPG/JPEG/GIF/WEBP 이미지 다중 업로드
+- Campaign Knowledge 8개 항목과 출처 페이지 표시
+- 분석 내용 수정 및 검토 저장
+- 최종 `campaign.md` 생성 요청
+
+캠페인 입력은 PDF 1개가 필수이며 HTML과 이미지는 선택 입력이다.
 
 브랜드 분석에는 Brand Identity 또는 Verbal Guideline PDF가 한 개 이상 필요하다.
 시각 자산과 색상은 PDF 분석 결과의 Visual Guideline에 함께 저장된다. 스포이트는
