@@ -156,6 +156,9 @@ const campaignState = {
   error: "",
   notice: "",
 };
+const flowState = {
+  projectId: sessionStorage.getItem("projectId") || "",
+};
 const assetPreviewUrls = new WeakMap();
 
 const app = document.querySelector("#app");
@@ -690,6 +693,8 @@ async function analyzeBrand() {
       fonts: brandState.files.fonts,
       colors: brandState.colors,
     });
+    flowState.projectId = brandState.analysis.project_id;
+    sessionStorage.setItem("projectId", flowState.projectId);
     routeTo(3);
   } catch (error) {
     brandState.error = error.message;
@@ -732,6 +737,12 @@ async function finalizeBrand() {
 
 async function analyzeCampaign() {
   const strategyFile = campaignState.files.strategy[0];
+  const projectId = flowState.projectId || brandState.analysis?.project_id;
+  if (!projectId) {
+    campaignState.error = "브랜드 분석 후 캠페인 전략을 입력해 주세요.";
+    routeTo(4);
+    return;
+  }
   if (!strategyFile) {
     campaignState.error = "캠페인 전략 PDF 1개를 첨부해 주세요.";
     routeTo(4);
@@ -742,6 +753,7 @@ async function analyzeCampaign() {
   routeTo(6);
   try {
     campaignState.analysis = await window.CampaignAPI.analyze({
+      projectId,
       strategyFile,
       componentFiles: campaignState.files.components,
       assetFiles: campaignState.files.assets,
