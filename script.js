@@ -7,6 +7,9 @@ const screens = [
   "campaign-uploaded",
   "campaign-loading",
   "campaign-check",
+  "persona-input",
+  "persona-loading",
+  "persona-check",
 ];
 
 const brandUploadFields = [
@@ -140,6 +143,15 @@ const campaignReviewFields = [
   ["cta_map", "CTA Map"],
 ];
 
+const personaReviewFields = [
+  ["profile", "Profile"],
+  ["situation", "Situation"],
+  ["needs", "Needs"],
+  ["pain_points", "Pain Point"],
+  ["interests", "Interest"],
+  ["behaviors", "Behavior"],
+];
+
 const brandState = {
   files: Object.fromEntries(brandUploadFields.map(({ key }) => [key, []])),
   colors: [],
@@ -153,6 +165,15 @@ const campaignState = {
   files: Object.fromEntries(campaignUploadFields.map(({ key }) => [key, []])),
   analysis: null,
   markdown: "",
+  error: "",
+  notice: "",
+};
+const personaState = {
+  inputs: [""],
+  analysis: null,
+  markdownFiles: [],
+  activeIndex: 0,
+  loadingPhase: 0,
   error: "",
   notice: "",
 };
@@ -196,9 +217,15 @@ function routeTo(index) {
 }
 
 function progressMarkup(progress) {
+  const partialIndex = progress.findIndex((value) => value > 0 && value < 1);
+  const lastStartedIndex = progress.reduce(
+    (last, value, index) => (value > 0 ? index : last),
+    0,
+  );
+  const step = (partialIndex >= 0 ? partialIndex : lastStartedIndex) + 1;
   return `
     <div class="progress" aria-label="5단계 중 진행 상태">
-      <span class="progress__label">Step 1/5</span>
+      <span class="progress__label">Step ${step}/5</span>
       <div class="progress__track" aria-hidden="true">
         ${progress.map((value) => `
           <span class="progress__segment">
@@ -240,9 +267,11 @@ function headerMarkup(title, description, progress) {
 }
 
 function feedbackMarkup() {
-  const state = currentIndex >= screens.indexOf("campaign-input")
-    ? campaignState
-    : brandState;
+  const state = currentIndex >= screens.indexOf("persona-input")
+    ? personaState
+    : currentIndex >= screens.indexOf("campaign-input")
+      ? campaignState
+      : brandState;
   if (state.error) {
     return `<div class="api-feedback api-feedback--error" role="alert">${escapeHTML(state.error)}</div>`;
   }
@@ -433,17 +462,36 @@ function loadingMarkup(type) {
     index === 0 ? "loading" : "waiting",
     `${index === 0 ? "PDF 분석 중" : "저장 대기 중"} · ${file.name}`,
   ]);
-  const rows = type === "brand" ? brandRows : campaignRows;
+  const personaRows = personaState.inputs.map((value, index) => {
+    const label = `페르소나 ${String.fromCharCode(65 + index)}`;
+    if (index < personaState.loadingPhase) return ["done", `생성 완료 · ${label}`];
+    if (index === personaState.loadingPhase) return ["loading", `생성 중 · ${label}`];
+    return ["waiting", `생성 대기 · ${label}`];
+  });
+  const rows = type === "brand"
+    ? brandRows
+    : type === "campaign"
+      ? campaignRows
+      : personaRows;
   const rowMarkup = rows.map(([state, text]) => {
     const icon = state === "done" ? "status-check.svg" : state === "loading" ? "spinner.svg" : "status-dot.svg";
     return `<li class="loading-row loading-row--${state}"><img src="assets/${icon}" alt="" /><span>${escapeHTML(text)}</span></li>`;
   }).join("");
 
+  const title = type === "persona"
+    ? "AI가 페르소나를 만들고 있어요"
+    : "AI가 문서를 읽고 있어요";
+  const description = type === "persona"
+    ? "보통 10초 안에 끝나요"
+    : "PDF 분량에 따라 시간이 걸릴 수 있어요.";
+  const progress = type === "persona"
+    ? '<img class="persona-loading-progress" src="assets/persona-progress.svg" alt="" />'
+    : '<div class="loading-progress"><span></span></div>';
   return `
     <section class="loading-screen" aria-live="polite">
       <div class="loading-card">
-        <div class="loading-card__header"><h1>AI가 문서를 읽고 있어요</h1><p>PDF 분량에 따라 시간이 걸릴 수 있어요.</p></div>
-        <div class="loading-card__body"><ul class="loading-list">${rowMarkup}</ul><div class="loading-progress"><span></span></div></div>
+        <div class="loading-card__header"><h1>${title}</h1><p>${description}</p></div>
+        <div class="loading-card__body"><ul class="loading-list">${rowMarkup}</ul>${progress}</div>
       </div>
     </section>`;
 }
@@ -635,6 +683,124 @@ function campaignFilesMarkup(field, isUploaded) {
   return `${rows}${input}${isUploaded ? addButton : ""}`;
 }
 
+function personaInputMarkup() {
+  const areas = personaState.inputs.map((value, index) => `
+    <section class="persona-input-area">
+      <div class="persona-input-area__header">
+        <h2>Persona ${String.fromCharCode(65 + index)}</h2>
+        ${index > 0 ? `
+          <button type="button" class="persona-remove-button" data-remove-persona="${index}" aria-label="Persona ${String.fromCharCode(65 + index)} 삭제">
+            <img src="assets/persona-remove.svg" alt="" />
+          </button>` : ""}
+      </div>
+      <div class="persona-textarea-wrap">
+        <textarea
+          class="persona-input-textarea"
+          data-persona-input="${index}"
+          maxlength="5000"
+          placeholder="어떤 사람인지, 현재 상황과 원하는 변화, 불편함이나 구매 행동 등을 자유롭게 작성해 주세요."
+          aria-label="Persona ${String.fromCharCode(65 + index)} 설명"
+        >${escapeHTML(value)}</textarea>
+        <img class="textarea-grip" src="assets/grip.svg" alt="" />
+      </div>
+      <p class="persona-input-caption">자연어로 입력하면 AI가 항목별로 분류하고 브랜드·캠페인 맥락을 반영해 보완합니다.</p>
+    </section>`).join("");
+  const canAdd = personaState.inputs.length < 5;
+  return `
+    <div class="screen-content screen-content--persona-input">
+      ${headerMarkup("Persona", "타깃으로 생각하는 사람의 특징을 자유롭게 입력해 주세요.", [1, 1, 0.5, 0, 0])}
+      ${feedbackMarkup()}
+      <form class="persona-form" onsubmit="return false">
+        ${areas}
+        <div class="persona-add-row">
+          <span>${personaState.inputs.length}/5</span>
+          <button type="button" class="persona-add-button" data-add-persona aria-label="페르소나 추가" ${canAdd ? "" : "disabled"}>
+            <img src="assets/persona-add.svg" alt="" />
+          </button>
+        </div>
+      </form>
+    </div>`;
+}
+
+function personaBulletText(items) {
+  return items.map((item) => `• ${item}`).join("\n");
+}
+
+function parsePersonaBulletText(value) {
+  return value
+    .split("\n")
+    .map((item) => item.replace(/^\s*[•*-]\s*/, "").trim())
+    .filter(Boolean)
+    .slice(0, 5);
+}
+
+function personaReviewItem(index, title, items, attribute, fieldKey) {
+  const content = personaBulletText(items);
+  return `
+    <div class="review-item persona-review-item">
+      <div class="review-item__header">
+        <span>${index}. ${escapeHTML(title)}</span>
+        <button class="refresh-button" type="button" data-refresh>
+          <img src="assets/refresh.svg" alt="" /><span>원문 복원</span>
+        </button>
+      </div>
+      <div class="textarea-wrap">
+        <textarea
+          class="review-textarea persona-review-textarea"
+          ${attribute}="${fieldKey}"
+          data-original-value="${escapeHTML(content)}"
+          aria-label="${escapeHTML(title)}"
+        >${escapeHTML(content)}</textarea>
+        <img class="textarea-grip" src="assets/grip.svg" alt="" />
+      </div>
+    </div>`;
+}
+
+function personaCheckMarkup() {
+  const personas = personaState.analysis?.data?.personas;
+  if (!personas?.length) {
+    return `
+      <div class="screen-content screen-content--review">
+        ${headerMarkup("Persona Check", "AI가 생성한 페르소나를 확인해 주세요.", [1, 1, 1, 0, 0])}
+        ${feedbackMarkup()}
+        <div class="api-feedback api-feedback--error" role="alert">생성 결과를 찾을 수 없습니다. 페르소나를 다시 입력해 주세요.</div>
+      </div>`;
+  }
+  personaState.activeIndex = Math.min(personaState.activeIndex, personas.length - 1);
+  const active = personas[personaState.activeIndex];
+  const tabs = personas.map((persona, index) => `
+    <button
+      type="button"
+      class="persona-tab ${index === personaState.activeIndex ? "persona-tab--active" : ""}"
+      data-persona-tab="${index}"
+      role="tab"
+      aria-selected="${index === personaState.activeIndex}"
+    >${escapeHTML(persona.name)}</button>`).join("");
+  const primaryItems = personaReviewFields.map(([fieldKey, label], index) => (
+    personaReviewItem(index + 1, label, active[fieldKey], "data-persona-field", fieldKey)
+  )).join("");
+  const appendixItems = [
+    personaReviewItem(1, "Purchase Journey", active.appendix.purchase_journey, "data-persona-appendix-field", "purchase_journey"),
+    personaReviewItem(2, "Dislikes", active.appendix.dislikes, "data-persona-appendix-field", "dislikes"),
+  ].join("");
+  return `
+    <div class="screen-content screen-content--review screen-content--persona-review">
+      ${headerMarkup("Persona Check", "AI가 분류하고 추론한 정보를 확인한 뒤 필요한 내용을 수정해 주세요.", [1, 1, 1, 0, 0])}
+      ${feedbackMarkup()}
+      <div class="persona-tabs" role="tablist" aria-label="생성된 페르소나">${tabs}</div>
+      <div class="review-area persona-review-area" role="tabpanel">
+        <section class="review-section">
+          <div class="review-section__title"><h2>${escapeHTML(active.name)}</h2></div>
+          <div class="review-section__items">${primaryItems}</div>
+        </section>
+        <section class="review-section">
+          <div class="review-section__title"><h2>Appendix</h2></div>
+          <div class="review-section__items">${appendixItems}</div>
+        </section>
+      </div>
+    </div>`;
+}
+
 function render() {
   window.clearTimeout(loadingTimer);
   const screen = screens[currentIndex];
@@ -648,11 +814,20 @@ function render() {
     "campaign-uploaded": () => campaignInputMarkup(true),
     "campaign-loading": () => loadingMarkup("campaign"),
     "campaign-check": () => checkMarkup("campaign"),
+    "persona-input": personaInputMarkup,
+    "persona-loading": () => loadingMarkup("persona"),
+    "persona-check": personaCheckMarkup,
   }[screen];
 
   app.innerHTML = renderScreen();
   window.scrollTo(0, 0);
   updateNavigation(screen);
+  if (screen === "persona-loading" && personaState.loadingPhase < personaState.inputs.length - 1) {
+    loadingTimer = window.setTimeout(() => {
+      personaState.loadingPhase += 1;
+      render();
+    }, 1200);
+  }
 }
 
 function updateNavigation(screen) {
@@ -660,7 +835,11 @@ function updateNavigation(screen) {
   previousButton.hidden = currentIndex < 2;
   previousButton.disabled = false;
   nextButton.disabled = false;
-  nextButton.querySelector("span").textContent = screen.endsWith("-check") ? "확정" : "Next";
+  const personaComplete = screen === "persona-check" && personaState.analysis?.status === "finalized";
+  nextButton.disabled = personaComplete;
+  nextButton.querySelector("span").textContent = personaComplete
+    ? "완료"
+    : screen.endsWith("-check") ? "확정" : "Next";
 }
 
 async function analyzeBrand() {
@@ -785,6 +964,7 @@ async function finalizeCampaign() {
   navigation.hidden = true;
   try {
     const data = collectReviewedCampaignData();
+    campaignState.analysis.data = structuredClone(data);
     campaignState.analysis = await window.CampaignAPI.review(
       campaignState.analysis.campaign_id,
       data,
@@ -794,9 +974,63 @@ async function finalizeCampaign() {
     );
     campaignState.markdown = finalized.markdown;
     campaignState.notice = "Campaign Knowledge 검토가 완료되어 campaign.md를 생성했습니다.";
-    render();
+    routeTo(screens.indexOf("persona-input"));
   } catch (error) {
     campaignState.error = error.message;
+    render();
+  }
+}
+
+async function analyzePersonas() {
+  const projectId = flowState.projectId || campaignState.analysis?.project_id;
+  const inputs = personaState.inputs.map((value) => value.trim());
+  if (!projectId) {
+    personaState.error = "브랜드와 캠페인 분석을 완료한 뒤 페르소나를 생성해 주세요.";
+    render();
+    return;
+  }
+  if (inputs.some((value) => !value)) {
+    personaState.error = "모든 페르소나 설명을 입력해 주세요.";
+    render();
+    return;
+  }
+  personaState.inputs = inputs;
+  personaState.error = "";
+  personaState.notice = "";
+  personaState.loadingPhase = 0;
+  routeTo(screens.indexOf("persona-loading"));
+  try {
+    personaState.analysis = await window.PersonaAPI.analyze(projectId, inputs);
+    personaState.activeIndex = 0;
+    routeTo(screens.indexOf("persona-check"));
+  } catch (error) {
+    personaState.error = error.message;
+    routeTo(screens.indexOf("persona-input"));
+  }
+}
+
+async function finalizePersonas() {
+  if (!personaState.analysis?.persona_id) {
+    personaState.error = "생성 결과가 없어 확정할 수 없습니다.";
+    render();
+    return;
+  }
+  personaState.error = "";
+  navigation.hidden = true;
+  try {
+    personaState.analysis = await window.PersonaAPI.review(
+      personaState.analysis.persona_id,
+      personaState.analysis.data,
+    );
+    const finalized = await window.PersonaAPI.finalize(
+      personaState.analysis.persona_id,
+    );
+    personaState.analysis.status = finalized.status;
+    personaState.markdownFiles = finalized.files;
+    personaState.notice = `${finalized.files.map((item) => item.filename).join(", ")} 파일을 생성했습니다.`;
+    render();
+  } catch (error) {
+    personaState.error = error.message;
     render();
   }
 }
@@ -880,6 +1114,14 @@ nextButton.addEventListener("click", async () => {
     await finalizeCampaign();
     return;
   }
+  if (screen === "persona-input") {
+    await analyzePersonas();
+    return;
+  }
+  if (screen === "persona-check") {
+    await finalizePersonas();
+    return;
+  }
   if (currentIndex < screens.length - 1) routeTo(currentIndex + 1);
 });
 
@@ -894,6 +1136,27 @@ app.addEventListener("click", async (event) => {
   const eyedropper = event.target.closest("[data-eyedropper]");
   const removeCampaignFile = event.target.closest("[data-remove-campaign-file]");
   const addCampaignFile = event.target.closest("[data-add-campaign-file]");
+  const addPersona = event.target.closest("[data-add-persona]");
+  const removePersona = event.target.closest("[data-remove-persona]");
+  const personaTab = event.target.closest("[data-persona-tab]");
+
+  if (addPersona && personaState.inputs.length < 5) {
+    personaState.inputs.push("");
+    personaState.error = "";
+    render();
+  }
+  if (removePersona) {
+    const index = Number(removePersona.dataset.removePersona);
+    if (index > 0 && index < personaState.inputs.length) {
+      personaState.inputs.splice(index, 1);
+      personaState.error = "";
+      render();
+    }
+  }
+  if (personaTab) {
+    personaState.activeIndex = Number(personaTab.dataset.personaTab);
+    render();
+  }
 
   if (removeCampaignFile) {
     const group = removeCampaignFile.dataset.campaignGroup;
@@ -931,7 +1194,10 @@ app.addEventListener("click", async (event) => {
   }
   if (refresh) {
     const textarea = refresh.closest(".review-item")?.querySelector("textarea");
-    if (textarea) textarea.value = textarea.dataset.originalValue || "";
+    if (textarea) {
+      textarea.value = textarea.dataset.originalValue || "";
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    }
   }
   if (addFile) {
     const group = addFile.dataset.brandGroup;
@@ -1015,6 +1281,20 @@ app.addEventListener("change", (event) => {
 app.addEventListener("input", (event) => {
   if (event.target.matches("[data-brand-path]")) brandState.error = "";
   if (event.target.matches("[data-campaign-path]")) campaignState.error = "";
+  if (event.target.matches("[data-persona-input]")) {
+    personaState.inputs[Number(event.target.dataset.personaInput)] = event.target.value;
+    personaState.error = "";
+  }
+  if (event.target.matches("[data-persona-field]")) {
+    const persona = personaState.analysis.data.personas[personaState.activeIndex];
+    persona[event.target.dataset.personaField] = parsePersonaBulletText(event.target.value);
+    personaState.error = "";
+  }
+  if (event.target.matches("[data-persona-appendix-field]")) {
+    const persona = personaState.analysis.data.personas[personaState.activeIndex];
+    persona.appendix[event.target.dataset.personaAppendixField] = parsePersonaBulletText(event.target.value);
+    personaState.error = "";
+  }
   if (event.target.matches("[data-color-hex]")) {
     brandState.colorDraft = event.target.value;
     brandState.error = "";

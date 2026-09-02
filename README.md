@@ -65,6 +65,20 @@ BRAND_API_BASE_URL=https://landing-api.ynana.xyz/api
 캠페인 입력은 PDF 1개가 필수이며 HTML과 이미지는 선택 입력이다.
 캠페인 분석은 브랜드 분석 후 생성된 `project_id`가 있어야 진행된다.
 
+## 페르소나 연결 범위
+
+- 자연어 페르소나 설명 최초 1개, 최대 5개 입력
+- 입력별 추가·삭제와 생성 중 상태 표시
+- `brand.md`와 `campaign.md`를 참고한 AI 분류·추론 요청
+- AI가 생성한 이름을 사용하는 가로 스크롤 검토 탭
+- Profile, Situation, Needs, Pain Point, Interest, Behavior 편집
+- Appendix의 Purchase Journey와 Dislikes 편집
+- 입력 순서에 따라 `persona-a.md`부터 `persona-e.md`까지 개별 생성
+
+검토 항목은 화면에서 불릿 목록으로 표시하며 줄 단위로 수정한다. 원문과 AI의
+추론은 구분 표시하지 않고 자연스럽게 합쳐진 결과를 사용한다. Persona 이후 단계는
+아직 정해지지 않아 확정 뒤에는 현재 검토 화면에서 완료 상태를 표시한다.
+
 브랜드 분석에는 Brand Identity 또는 Verbal Guideline PDF가 한 개 이상 필요하다.
 시각 자산과 색상은 PDF 분석 결과의 Visual Guideline에 함께 저장된다. 스포이트는
 EyeDropper API를 지원하는 브라우저에서 동작하며, 그 외 브라우저에서는 기본 색상
