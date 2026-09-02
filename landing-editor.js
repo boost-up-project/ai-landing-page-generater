@@ -381,9 +381,14 @@
     }
     root.querySelectorAll("[data-component-frame]").forEach((frame) => {
       frame.addEventListener("load", () => {
-        frame.style.height = `${Math.max(240, frame.contentDocument?.documentElement.scrollHeight || 0)}px`;
+        frame.style.height = `${frameHeight(frame, frame.contentDocument?.documentElement.scrollHeight)}px`;
       });
     });
+  }
+
+  function frameHeight(frame, height) {
+    const minimum = frame.closest(".landing-component--fixed") ? 36 : 240;
+    return Math.max(minimum, Number(height) || 0);
   }
 
   async function create(projectId) {
@@ -454,7 +459,7 @@
   window.addEventListener("message", (event) => {
     if (event.data?.type === "landing-frame-height") {
       const frame = document.querySelector(`[data-component-frame="${CSS.escape(event.data.instanceId)}"]`);
-      if (frame) frame.style.height = `${Math.max(240, Number(event.data.height) || 0)}px`;
+      if (frame) frame.style.height = `${frameHeight(frame, event.data.height)}px`;
     }
     if (event.data?.type === "landing-editable-select") {
       state.selectedInstanceId = event.data.instanceId;

@@ -277,6 +277,10 @@ body[data-screen="landing-editor"] .page {
   outline: 0;
 }
 
+.landing-component--fixed .landing-component__frame {
+  min-height: 36px;
+}
+
 .landing-component--fixed:hover {
   z-index: auto;
   outline: 0;
