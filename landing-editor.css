@@ -285,7 +285,7 @@ body[data-screen="landing-editor"] .page {
 
 .landing-component:hover,
 .landing-component--selected {
-  z-index: 2;
+  z-index: 10;
   outline-color: #0088ff;
 }
 
