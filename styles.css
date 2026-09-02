@@ -955,6 +955,134 @@ body[data-screen="persona-loading"] .loading-row--done {
   white-space: pre-wrap;
 }
 
+.screen-content--final-check {
+  width: 500px;
+  padding: 80px 0 160px;
+}
+
+.screen-content--final-check .progress__label {
+  color: #2e3338;
+  font-size: 10px;
+  letter-spacing: -0.1px;
+}
+
+.screen-content--final-check .heading-block h1 {
+  font-size: 28px;
+}
+
+.screen-content--final-check .heading-block__description {
+  color: #2e3338;
+  font-size: 14px;
+}
+
+.final-check-list {
+  display: flex;
+  margin-top: 80px;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.final-check-section {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.final-check-section__header {
+  display: flex;
+  min-height: 25px;
+  align-items: center;
+  gap: 5px;
+}
+
+.final-check-section__toggle {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 5px;
+  text-align: left;
+}
+
+.final-check-section__toggle img,
+.final-check-section__edit,
+.final-check-section__edit img {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+
+.final-check-section__toggle img {
+  transition: transform 160ms ease;
+}
+
+.final-check-section--open .final-check-section__toggle img {
+  transform: rotate(90deg);
+}
+
+.final-check-section__toggle span {
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.final-check-section__edit {
+  flex: 0 0 20px;
+}
+
+.final-check-section__body {
+  display: flex;
+  margin-top: 12px;
+  padding-top: 16px;
+  flex-direction: column;
+  gap: 18px;
+  border-top: 1px solid #e5e8eb;
+}
+
+.final-check-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.final-check-row strong {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.final-check-row div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.final-check-row p {
+  margin: 0;
+  color: #2e3338;
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: pre-wrap;
+}
+
+.final-check-row .final-check-row__empty {
+  color: var(--placeholder);
+}
+
+body[data-screen="final-check"] .page-direction--previous {
+  right: 150px;
+  left: auto;
+}
+
+body[data-screen="final-check"] .page-direction--next {
+  background: var(--blue);
+  color: #fff;
+  font-weight: 700;
+}
+
 .review-section {
   display: flex;
   flex-direction: column;

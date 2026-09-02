@@ -10,6 +10,7 @@ const screens = [
   "persona-input",
   "persona-loading",
   "persona-check",
+  "final-check",
 ];
 
 const brandUploadFields = [
@@ -176,6 +177,9 @@ const personaState = {
   loadingPhase: 0,
   error: "",
   notice: "",
+};
+const finalCheckState = {
+  openSection: "",
 };
 const flowState = {
   projectId: sessionStorage.getItem("projectId") || "",
@@ -801,6 +805,61 @@ function personaCheckMarkup() {
     </div>`;
 }
 
+function finalCheckRows(rows) {
+  return rows.map(({ label, value }, index) => {
+    const values = Array.isArray(value) ? value : [value];
+    const content = values.filter(Boolean).map((item) => `<p>${escapeHTML(item)}</p>`).join("");
+    return `
+      <div class="final-check-row">
+        <strong>${index + 1}. ${escapeHTML(label)}</strong>
+        <div>${content || '<p class="final-check-row__empty">내용 없음</p>'}</div>
+      </div>`;
+  }).join("");
+}
+
+function finalCheckSection(key, title, rows) {
+  const isOpen = finalCheckState.openSection === key;
+  return `
+    <section class="final-check-section ${isOpen ? "final-check-section--open" : ""}">
+      <div class="final-check-section__header">
+        <button type="button" class="final-check-section__toggle" data-final-toggle="${key}" aria-expanded="${isOpen}">
+          <img src="assets/chevron-right.svg" alt="" />
+          <span>${escapeHTML(title)}</span>
+        </button>
+        <button type="button" class="final-check-section__edit" data-final-edit="${key}" aria-label="${escapeHTML(title)} 수정">
+          <img src="assets/edit-filled.svg" alt="" />
+        </button>
+      </div>
+      ${isOpen ? `<div class="final-check-section__body">${finalCheckRows(rows)}</div>` : ""}
+    </section>`;
+}
+
+function finalCheckMarkup() {
+  const brandRows = Object.entries(brandReviewFields).flatMap(([groupKey, group]) => (
+    group.fields.map(([fieldKey, label]) => {
+      return { label, value: brandState.analysis?.data?.[groupKey]?.[fieldKey]?.content || "" };
+    })
+  ));
+  const campaignRows = campaignReviewFields.map(([fieldKey, label]) => ({
+    label,
+    value: campaignState.analysis?.data?.[fieldKey]?.content || "",
+  }));
+  const personaRows = (personaState.analysis?.data?.personas || []).flatMap((persona) => [
+    { label: persona.name, value: personaReviewFields.flatMap(([fieldKey]) => persona[fieldKey] || []) },
+    { label: `${persona.name} · Purchase Journey`, value: persona.appendix?.purchase_journey || [] },
+    { label: `${persona.name} · Dislikes`, value: persona.appendix?.dislikes || [] },
+  ]);
+  return `
+    <div class="screen-content screen-content--final-check">
+      ${headerMarkup("Final Check", "브랜드, 캠페인, 페르소나를 다시 한번 더 확인해 보세요.", [1, 1, 1, 1, 0])}
+      <div class="final-check-list">
+        ${finalCheckSection("brand", "Brand Identity", brandRows)}
+        ${finalCheckSection("campaign", "Campaign Strategy", campaignRows)}
+        ${finalCheckSection("persona", "Persona", personaRows)}
+      </div>
+    </div>`;
+}
+
 function render() {
   window.clearTimeout(loadingTimer);
   const screen = screens[currentIndex];
@@ -817,6 +876,7 @@ function render() {
     "persona-input": personaInputMarkup,
     "persona-loading": () => loadingMarkup("persona"),
     "persona-check": personaCheckMarkup,
+    "final-check": finalCheckMarkup,
   }[screen];
 
   app.innerHTML = renderScreen();
@@ -834,11 +894,11 @@ function updateNavigation(screen) {
   navigation.hidden = screen.endsWith("-loading");
   previousButton.hidden = currentIndex < 2;
   previousButton.disabled = false;
+  previousButton.querySelector("span").textContent = screen === "final-check" ? "이전" : "Previous";
   nextButton.disabled = false;
-  const personaComplete = screen === "persona-check" && personaState.analysis?.status === "finalized";
-  nextButton.disabled = personaComplete;
-  nextButton.querySelector("span").textContent = personaComplete
-    ? "완료"
+  nextButton.disabled = false;
+  nextButton.querySelector("span").textContent = screen === "final-check"
+    ? "랜딩페이지 생성"
     : screen.endsWith("-check") ? "확정" : "Next";
 }
 
@@ -1028,7 +1088,7 @@ async function finalizePersonas() {
     personaState.analysis.status = finalized.status;
     personaState.markdownFiles = finalized.files;
     personaState.notice = `${finalized.files.map((item) => item.filename).join(", ")} 파일을 생성했습니다.`;
-    render();
+    routeTo(screens.indexOf("final-check"));
   } catch (error) {
     personaState.error = error.message;
     render();
@@ -1122,6 +1182,7 @@ nextButton.addEventListener("click", async () => {
     await finalizePersonas();
     return;
   }
+  if (screen === "final-check") return;
   if (currentIndex < screens.length - 1) routeTo(currentIndex + 1);
 });
 
@@ -1139,6 +1200,23 @@ app.addEventListener("click", async (event) => {
   const addPersona = event.target.closest("[data-add-persona]");
   const removePersona = event.target.closest("[data-remove-persona]");
   const personaTab = event.target.closest("[data-persona-tab]");
+  const finalToggle = event.target.closest("[data-final-toggle]");
+  const finalEdit = event.target.closest("[data-final-edit]");
+
+  if (finalToggle) {
+    finalCheckState.openSection = finalCheckState.openSection === finalToggle.dataset.finalToggle
+      ? ""
+      : finalToggle.dataset.finalToggle;
+    render();
+  }
+  if (finalEdit) {
+    const targetIndex = {
+      brand: screens.indexOf("brand-check"),
+      campaign: screens.indexOf("campaign-check"),
+      persona: screens.indexOf("persona-check"),
+    }[finalEdit.dataset.finalEdit];
+    if (Number.isInteger(targetIndex)) routeTo(targetIndex);
+  }
 
   if (addPersona && personaState.inputs.length < 5) {
     personaState.inputs.push("");
