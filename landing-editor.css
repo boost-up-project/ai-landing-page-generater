@@ -378,6 +378,60 @@ body[data-screen="landing-editor"] .page {
   line-height: 1.5;
 }
 
+.landing-inspector__body .landing-button {
+  width: 100%;
+}
+
+.landing-inspector__body .landing-button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.landing-inspector__divider {
+  height: 1px;
+  margin: 4px 0;
+  background: #e5e8eb;
+}
+
+.landing-copy-candidates {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.landing-copy-candidate {
+  display: flex;
+  width: 100%;
+  padding: 10px;
+  flex-direction: column;
+  gap: 5px;
+  border: 1px solid #d1d9e0;
+  border-radius: 8px;
+  background: #fff;
+  text-align: left;
+}
+
+.landing-copy-candidate:hover {
+  border-color: #0088ff;
+  background: #f7fbff;
+}
+
+.landing-copy-candidate span {
+  color: #0088ff;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.landing-copy-candidate strong {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.landing-inspector__error {
+  color: #d1242f !important;
+}
+
 .landing-inspector__body p,
 .landing-inspector__empty p {
   margin: 0;

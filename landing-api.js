@@ -40,6 +40,14 @@
       return request(`/landings/${landingId}`);
     },
 
+    async copyCandidates(landingId, payload) {
+      return request(`/landings/${landingId}/copy-candidates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+
     assetUrl(landingId, filename) {
       if (!baseUrl) return "";
       return `${baseUrl}/landings/${encodeURIComponent(landingId)}/assets/${encodeURIComponent(filename)}`;

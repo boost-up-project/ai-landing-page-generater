@@ -11,6 +11,10 @@
     future: [],
     draggedInstanceId: "",
     draggedTemplateId: "",
+    copyPrompt: "",
+    copyCandidates: [],
+    candidateLoading: false,
+    candidateError: "",
   };
 
   function escapeHTML(value = "") {
@@ -42,14 +46,16 @@
     );
   }
 
-  function commitMutation(mutator) {
+  function commitMutation(mutator, { preserveSelection = false } = {}) {
     if (!state.landing) return;
     state.history.push(clonePages());
     if (state.history.length > 50) state.history.shift();
     state.future = [];
     mutator();
-    state.selectedInstanceId = "";
-    state.selectedEditable = null;
+    if (!preserveSelection) {
+      state.selectedInstanceId = "";
+      state.selectedEditable = null;
+    }
     persistDraft();
     requestRender();
   }
@@ -96,6 +102,7 @@
             type: "landing-editable-select",
             instanceId: ${JSON.stringify(component.instance_id)},
             editableIndex: editableNodes().indexOf(target),
+            editableTypeIndex: editableNodes().filter((item) => item.dataset.editable === target.dataset.editable).indexOf(target),
             editableType: target.dataset.editable,
             value: target.dataset.editable === "image" ? target.getAttribute("src") || "" : target.textContent || "",
             alt: target.getAttribute("alt") || ""
@@ -151,16 +158,37 @@
         </div>`;
     }
     const isImage = state.selectedEditable.editableType === "image";
+    const copyCandidates = state.copyCandidates.map((candidate, index) => `
+      <button type="button" class="landing-copy-candidate" data-copy-candidate="${index}">
+        <span>후보 ${index + 1}</span>
+        <strong>${escapeHTML(candidate)}</strong>
+      </button>`).join("");
     return `
       <div class="landing-inspector__header">
         <span>${isImage ? "이미지" : "카피"} 편집</span>
         <button type="button" data-close-inspector aria-label="속성 패널 닫기">×</button>
       </div>
       <div class="landing-inspector__body">
-        <label>${isImage ? "대체 텍스트" : "현재 문구"}
-          <textarea data-editable-draft>${escapeHTML(isImage ? state.selectedEditable.alt : state.selectedEditable.value)}</textarea>
-        </label>
-        <p>후보 생성과 이미지 교체 기능은 다음 구현 단위에서 연결됩니다.</p>
+        ${isImage ? `
+          <label>대체 텍스트
+            <textarea data-editable-draft>${escapeHTML(state.selectedEditable.alt)}</textarea>
+          </label>
+          <p>이미지 교체 기능은 다음 구현 단위에서 연결됩니다.</p>
+        ` : `
+          <label>현재 문구
+            <textarea data-editable-draft>${escapeHTML(state.selectedEditable.value)}</textarea>
+          </label>
+          <button type="button" class="landing-button landing-button--primary" data-apply-copy>현재 문구 적용</button>
+          <div class="landing-inspector__divider"></div>
+          <label>AI에게 추가로 요청하기
+            <textarea data-copy-prompt placeholder="예: 조금 더 짧고 위트 있게 작성해 주세요.">${escapeHTML(state.copyPrompt)}</textarea>
+          </label>
+          <button type="button" class="landing-button landing-button--secondary" data-generate-copy ${state.candidateLoading ? "disabled" : ""}>
+            ${state.candidateLoading ? "후보 생성 중..." : "카피 후보 새로고침"}
+          </button>
+          ${state.candidateError ? `<p class="landing-inspector__error">${escapeHTML(state.candidateError)}</p>` : ""}
+          ${copyCandidates ? `<div class="landing-copy-candidates">${copyCandidates}</div>` : ""}
+        `}
       </div>`;
   }
 
@@ -259,6 +287,8 @@
       state.activePersonaIndex = 0;
       state.history = [];
       state.future = [];
+      state.copyPrompt = "";
+      state.copyCandidates = [];
       persistDraft();
     } catch (error) {
       state.error = error.message;
@@ -276,6 +306,9 @@
     if (event.data?.type === "landing-editable-select") {
       state.selectedInstanceId = event.data.instanceId;
       state.selectedEditable = event.data;
+      state.copyPrompt = "";
+      state.copyCandidates = [];
+      state.candidateError = "";
       requestRender();
     }
   });
@@ -287,6 +320,9 @@
     const historyButton = event.target.closest("[data-history]");
     const componentAction = event.target.closest("[data-component-action]");
     const addTemplate = event.target.closest("[data-add-template]");
+    const applyCopy = event.target.closest("[data-apply-copy]");
+    const generateCopy = event.target.closest("[data-generate-copy]");
+    const copyCandidate = event.target.closest("[data-copy-candidate]");
     if (personaTab) {
       state.activePersonaIndex = Number(personaTab.dataset.landingPersona);
       state.selectedInstanceId = "";
@@ -326,6 +362,84 @@
       if (action === "delete") commitMutation(() => components.splice(index, 1));
     }
     if (addTemplate) addTemplateAt(addTemplate.dataset.addTemplate, activePage()?.components.length || 0);
+    if (applyCopy) applySelectedCopy(state.selectedEditable?.value || "");
+    if (copyCandidate) {
+      const value = state.copyCandidates[Number(copyCandidate.dataset.copyCandidate)];
+      if (value !== undefined) applySelectedCopy(value);
+    }
+    if (generateCopy) generateCopyCandidates();
+  });
+
+  function replaceCopyAt(source, typeIndex, value) {
+    const pattern = /(<([a-z][\w:-]*)\b(?=[^>]*\bdata-editable\s*=\s*['"]copy['"])[^>]*>)([\s\S]*?)(<\/\2\s*>)/gi;
+    let index = 0;
+    let replaced = false;
+    const escapedValue = escapeHTML(value);
+    const html = source.replace(pattern, (match, opening, tag, content, closing) => {
+      if (index++ !== typeIndex) return match;
+      replaced = true;
+      return `${opening}${escapedValue}${closing}`;
+    });
+    return replaced ? html : null;
+  }
+
+  function applySelectedCopy(value) {
+    const selected = state.selectedEditable;
+    if (!selected || selected.editableType !== "copy") return;
+    const component = activePage()?.components.find(
+      (item) => item.instance_id === selected.instanceId,
+    );
+    if (!component) return;
+    const updated = replaceCopyAt(component.html, selected.editableTypeIndex, value);
+    if (updated === null) {
+      state.candidateError = "선택한 카피 영역을 찾을 수 없습니다.";
+      requestRender();
+      return;
+    }
+    commitMutation(() => {
+      component.html = updated;
+      state.selectedEditable.value = value;
+      state.copyCandidates = [];
+      state.candidateError = "";
+    }, { preserveSelection: true });
+  }
+
+  async function generateCopyCandidates() {
+    const selected = state.selectedEditable;
+    const page = activePage();
+    if (!selected || selected.editableType !== "copy" || !page || state.candidateLoading) return;
+    state.candidateLoading = true;
+    state.candidateError = "";
+    requestRender();
+    try {
+      const response = await window.LandingAPI.copyCandidates(
+        state.landing.landing_id,
+        {
+          persona_key: page.persona_key,
+          instance_id: selected.instanceId,
+          editable_index: selected.editableTypeIndex,
+          current_value: selected.value,
+          prompt: state.copyPrompt,
+        },
+      );
+      state.copyCandidates = response.candidates;
+    } catch (error) {
+      state.candidateError = error.message;
+    } finally {
+      state.candidateLoading = false;
+      requestRender();
+    }
+  }
+
+  document.addEventListener("input", (event) => {
+    if (event.target.matches("[data-editable-draft]") && state.selectedEditable) {
+      if (state.selectedEditable.editableType === "copy") {
+        state.selectedEditable.value = event.target.value;
+      } else {
+        state.selectedEditable.alt = event.target.value;
+      }
+    }
+    if (event.target.matches("[data-copy-prompt]")) state.copyPrompt = event.target.value;
   });
 
   function addTemplateAt(templateId, index) {
