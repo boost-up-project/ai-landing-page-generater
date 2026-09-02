@@ -181,6 +181,7 @@ const personaState = {
 };
 const finalCheckState = {
   openSection: "",
+  openPersonaIndex: 0,
 };
 const flowState = {
   projectId: sessionStorage.getItem("projectId") || "",
@@ -835,6 +836,59 @@ function finalCheckSection(key, title, rows) {
     </section>`;
 }
 
+function finalPersonaMarkup(personas) {
+  if (!personas.length) {
+    return '<p class="final-check-row__empty">생성된 페르소나가 없습니다.</p>';
+  }
+
+  if (finalCheckState.openPersonaIndex >= personas.length) {
+    finalCheckState.openPersonaIndex = 0;
+  }
+
+  return personas.map((persona, index) => {
+    const isOpen = finalCheckState.openPersonaIndex === index;
+    const rows = [
+      ...personaReviewFields.map(([fieldKey, label]) => ({
+        label,
+        value: persona[fieldKey] || [],
+      })),
+      { label: "Purchase Journey", value: persona.appendix?.purchase_journey || [] },
+      { label: "Dislikes", value: persona.appendix?.dislikes || [] },
+    ];
+
+    return `
+      <section class="final-persona ${isOpen ? "final-persona--open" : ""}">
+        <button
+          type="button"
+          class="final-persona__toggle"
+          data-final-persona-toggle="${index}"
+          aria-expanded="${isOpen}"
+        >
+          <img src="assets/chevron-right.svg" alt="" />
+          <span>${index + 1}. ${escapeHTML(persona.name || `Persona ${index + 1}`)}</span>
+        </button>
+        ${isOpen ? `<div class="final-persona__body">${finalCheckRows(rows)}</div>` : ""}
+      </section>`;
+  }).join("");
+}
+
+function finalPersonaSection(personas) {
+  const isOpen = finalCheckState.openSection === "persona";
+  return `
+    <section class="final-check-section ${isOpen ? "final-check-section--open" : ""}">
+      <div class="final-check-section__header">
+        <button type="button" class="final-check-section__toggle" data-final-toggle="persona" aria-expanded="${isOpen}">
+          <img src="assets/chevron-right.svg" alt="" />
+          <span>Persona</span>
+        </button>
+        <button type="button" class="final-check-section__edit" data-final-edit="persona" aria-label="Persona 수정">
+          <img src="assets/edit-filled.svg" alt="" />
+        </button>
+      </div>
+      ${isOpen ? `<div class="final-check-section__body final-check-section__body--persona">${finalPersonaMarkup(personas)}</div>` : ""}
+    </section>`;
+}
+
 function finalCheckMarkup() {
   const brandRows = Object.entries(brandReviewFields).flatMap(([groupKey, group]) => (
     group.fields.map(([fieldKey, label]) => {
@@ -845,18 +899,14 @@ function finalCheckMarkup() {
     label,
     value: campaignState.analysis?.data?.[fieldKey]?.content || "",
   }));
-  const personaRows = (personaState.analysis?.data?.personas || []).flatMap((persona) => [
-    { label: persona.name, value: personaReviewFields.flatMap(([fieldKey]) => persona[fieldKey] || []) },
-    { label: `${persona.name} · Purchase Journey`, value: persona.appendix?.purchase_journey || [] },
-    { label: `${persona.name} · Dislikes`, value: persona.appendix?.dislikes || [] },
-  ]);
+  const personas = personaState.analysis?.data?.personas || [];
   return `
     <div class="screen-content screen-content--final-check">
       ${headerMarkup("Final Check", "브랜드, 캠페인, 페르소나를 다시 한번 더 확인해 보세요.", [1, 1, 1, 1, 0])}
       <div class="final-check-list">
         ${finalCheckSection("brand", "Brand Identity", brandRows)}
         ${finalCheckSection("campaign", "Campaign Strategy", campaignRows)}
-        ${finalCheckSection("persona", "Persona", personaRows)}
+        ${finalPersonaSection(personas)}
       </div>
     </div>`;
 }
@@ -1209,12 +1259,20 @@ app.addEventListener("click", async (event) => {
   const removePersona = event.target.closest("[data-remove-persona]");
   const personaTab = event.target.closest("[data-persona-tab]");
   const finalToggle = event.target.closest("[data-final-toggle]");
+  const finalPersonaToggle = event.target.closest("[data-final-persona-toggle]");
   const finalEdit = event.target.closest("[data-final-edit]");
 
   if (finalToggle) {
     finalCheckState.openSection = finalCheckState.openSection === finalToggle.dataset.finalToggle
       ? ""
       : finalToggle.dataset.finalToggle;
+    render();
+  }
+  if (finalPersonaToggle) {
+    const personaIndex = Number(finalPersonaToggle.dataset.finalPersonaToggle);
+    finalCheckState.openPersonaIndex = finalCheckState.openPersonaIndex === personaIndex
+      ? -1
+      : personaIndex;
     render();
   }
   if (finalEdit) {

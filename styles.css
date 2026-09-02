@@ -1041,6 +1041,52 @@ body[data-screen="persona-loading"] .loading-row--done {
   border-top: 1px solid #e5e8eb;
 }
 
+.final-check-section__body--persona {
+  gap: 10px;
+}
+
+.final-persona {
+  overflow: hidden;
+  border: 1px solid #e5e8eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.final-persona__toggle {
+  display: flex;
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  align-items: center;
+  gap: 6px;
+  text-align: left;
+}
+
+.final-persona__toggle img {
+  display: block;
+  width: 16px;
+  height: 16px;
+  transition: transform 160ms ease;
+}
+
+.final-persona--open .final-persona__toggle img {
+  transform: rotate(90deg);
+}
+
+.final-persona__toggle span {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.final-persona__body {
+  display: flex;
+  padding: 0 12px 14px;
+  flex-direction: column;
+  gap: 18px;
+}
+
 .final-check-row {
   display: flex;
   flex-direction: column;
