@@ -242,7 +242,8 @@ body[data-screen="landing-editor"] .page {
 .landing-drop-zone {
   position: relative;
   z-index: 4;
-  height: 0;
+  height: 10px;
+  margin: -5px 0;
   transition: height 120ms ease;
 }
 
@@ -264,6 +265,7 @@ body[data-screen="landing-editor"] .page {
 
 .landing-drop-zone--active {
   height: 38px;
+  margin: 0;
 }
 
 .landing-drop-zone--active span {

@@ -11,6 +11,7 @@
     future: [],
     draggedInstanceId: "",
     draggedTemplateId: "",
+    pointerDragging: false,
     copyPrompt: "",
     copyCandidates: [],
     candidateLoading: false,
@@ -141,7 +142,7 @@
         data-landing-component="${escapeHTML(component.instance_id)}">
         <div class="landing-component__label">${escapeHTML(component.name)}</div>
         <div class="landing-component__toolbar" aria-label="${escapeHTML(component.name)} 설정">
-          <button type="button" data-component-action="drag" draggable="true" title="드래그해서 이동">⋮⋮</button>
+          <button type="button" data-component-action="drag" title="드래그해서 이동">⋮⋮</button>
           <button type="button" data-component-action="up" ${index === 0 ? "disabled" : ""} title="위로 이동">↑</button>
           <button type="button" data-component-action="down" ${index === count - 1 ? "disabled" : ""} title="아래로 이동">↓</button>
           <button type="button" data-component-action="duplicate" title="복제">복제</button>
@@ -758,14 +759,7 @@
   }
 
   document.addEventListener("dragstart", (event) => {
-    const handle = event.target.closest('[data-component-action="drag"]');
     const template = event.target.closest("[data-add-template]");
-    if (handle) {
-      state.draggedInstanceId = handle.closest("[data-landing-component]")?.dataset.landingComponent || "";
-      state.draggedTemplateId = "";
-      event.dataTransfer?.setData("text/plain", state.draggedInstanceId);
-      if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
-    }
     if (template) {
       state.draggedTemplateId = template.dataset.addTemplate;
       state.draggedInstanceId = "";
@@ -818,6 +812,56 @@
     document.querySelectorAll(".landing-drop-zone--active").forEach((item) => {
       item.classList.remove("landing-drop-zone--active");
     });
+  });
+
+  function clearActiveDropZones() {
+    document.querySelectorAll(".landing-drop-zone--active").forEach((item) => {
+      item.classList.remove("landing-drop-zone--active");
+    });
+  }
+
+  function activeDropZoneAt(clientX, clientY) {
+    return document.elementFromPoint(clientX, clientY)?.closest("[data-drop-index]");
+  }
+
+  function moveDraggedComponent(destination) {
+    const components = activePage()?.components;
+    const source = components?.findIndex((item) => item.instance_id === state.draggedInstanceId);
+    if (!components || source === undefined || source < 0) return;
+    const adjustedDestination = source < destination ? destination - 1 : destination;
+    if (source === adjustedDestination) return;
+    commitMutation(() => {
+      const [component] = components.splice(source, 1);
+      components.splice(adjustedDestination, 0, component);
+    });
+  }
+
+  document.addEventListener("pointerdown", (event) => {
+    const handle = event.target.closest('[data-component-action="drag"]');
+    if (!handle) return;
+    state.draggedInstanceId = handle.closest("[data-landing-component]")?.dataset.landingComponent || "";
+    state.draggedTemplateId = "";
+    state.pointerDragging = Boolean(state.draggedInstanceId);
+    if (state.pointerDragging) {
+      event.preventDefault();
+      handle.setPointerCapture?.(event.pointerId);
+    }
+  });
+
+  document.addEventListener("pointermove", (event) => {
+    if (!state.pointerDragging) return;
+    const zone = activeDropZoneAt(event.clientX, event.clientY);
+    clearActiveDropZones();
+    if (zone) zone.classList.add("landing-drop-zone--active");
+  });
+
+  document.addEventListener("pointerup", (event) => {
+    if (!state.pointerDragging) return;
+    const zone = activeDropZoneAt(event.clientX, event.clientY);
+    if (zone) moveDraggedComponent(Number(zone.dataset.dropIndex));
+    state.pointerDragging = false;
+    state.draggedInstanceId = "";
+    clearActiveDropZones();
   });
 
   window.LandingEditor = { create, markup, mount, state };
