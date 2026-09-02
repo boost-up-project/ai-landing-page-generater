@@ -40,6 +40,14 @@
       return request(`/landings/${landingId}`);
     },
 
+    async save(landingId, pages) {
+      return request(`/landings/${landingId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pages }),
+      });
+    },
+
     async copyCandidates(landingId, payload) {
       return request(`/landings/${landingId}/copy-candidates`, {
         method: "POST",

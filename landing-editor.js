@@ -18,6 +18,10 @@
     imagePrompt: "",
     assetLoading: false,
     assetError: "",
+    saveLoading: false,
+    saveError: "",
+    saveNotice: "",
+    previewOpen: false,
   };
 
   function escapeHTML(value = "") {
@@ -55,6 +59,8 @@
     if (state.history.length > 50) state.history.shift();
     state.future = [];
     mutator();
+    state.saveNotice = "";
+    state.saveError = "";
     if (!preserveSelection) {
       state.selectedInstanceId = "";
       state.selectedEditable = null;
@@ -118,6 +124,14 @@
         setTimeout(sendHeight, 100);
       <\/script>`;
     return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>${replaceAssetUrls(component.html)}${bridge}</body></html>`;
+  }
+
+  function previewDocument() {
+    const content = (activePage()?.components || [])
+      .filter((component) => !component.hidden)
+      .map((component) => replaceAssetUrls(component.html))
+      .join("\n");
+    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>${content}</body></html>`;
   }
 
   function componentCard(component, index, count) {
@@ -235,6 +249,21 @@
         `<div class="landing-drop-zone" data-drop-index="${index + 1}"><span>여기에 컴포넌트 추가</span></div>`,
       ]),
     ].join("");
+    const saveStatus = state.saveError
+      ? `<span class="landing-save-status landing-save-status--error">${escapeHTML(state.saveError)}</span>`
+      : state.saveNotice
+        ? `<span class="landing-save-status landing-save-status--success">${escapeHTML(state.saveNotice)}</span>`
+        : "";
+    const preview = state.previewOpen ? `
+      <div class="landing-preview" role="dialog" aria-modal="true" aria-label="랜딩 페이지 미리보기">
+        <div class="landing-preview__bar">
+          <div><strong>${escapeHTML(page.persona_name)}</strong><span>미리보기</span></div>
+          <button type="button" data-close-preview>편집기로 돌아가기</button>
+        </div>
+        <iframe title="${escapeHTML(page.persona_name)} 랜딩 페이지 전체 미리보기"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+          srcdoc="${escapeHTML(previewDocument())}"></iframe>
+      </div>` : "";
     return `
       <section class="landing-editor" aria-label="랜딩 페이지 편집기">
         <header class="landing-editor__topbar">
@@ -247,8 +276,11 @@
             <button type="button" data-history="redo" title="다시 실행" ${state.future.length ? "" : "disabled"}>↷</button>
           </div>
           <div class="landing-editor__actions">
+            ${saveStatus}
             <button type="button" class="landing-button landing-button--secondary" data-preview>미리보기</button>
-            <button type="button" class="landing-button landing-button--primary" data-save>저장</button>
+            <button type="button" class="landing-button landing-button--primary" data-save ${state.saveLoading ? "disabled" : ""}>
+              ${state.saveLoading ? "저장 중..." : "저장"}
+            </button>
           </div>
         </header>
         <div class="landing-editor__tabs" role="tablist" aria-label="페르소나별 랜딩 페이지">${tabs}</div>
@@ -264,7 +296,8 @@
           </main>
           <aside class="landing-panel landing-panel--inspector">${inspectorMarkup()}</aside>
         </div>
-      </section>`;
+      </section>
+      ${preview}`;
   }
 
   function markup() {
@@ -319,6 +352,8 @@
       state.copyPrompt = "";
       state.copyCandidates = [];
       state.imagePrompt = "";
+      state.saveError = "";
+      state.saveNotice = "";
       persistDraft();
     } catch (error) {
       state.error = error.message;
@@ -358,6 +393,9 @@
     const selectAsset = event.target.closest("[data-select-asset]");
     const applyImageAlt = event.target.closest("[data-apply-image-alt]");
     const generateImage = event.target.closest("[data-generate-image]");
+    const preview = event.target.closest("[data-preview]");
+    const closePreview = event.target.closest("[data-close-preview]");
+    const save = event.target.closest("[data-save]");
     if (personaTab) {
       state.activePersonaIndex = Number(personaTab.dataset.landingPersona);
       state.selectedInstanceId = "";
@@ -406,7 +444,43 @@
     if (selectAsset) applySelectedImage(`asset://${selectAsset.dataset.selectAsset}`);
     if (applyImageAlt) applySelectedImage(state.selectedEditable?.value || "");
     if (generateImage) generateImageAsset();
+    if (preview) {
+      state.previewOpen = true;
+      requestRender();
+    }
+    if (closePreview) {
+      state.previewOpen = false;
+      requestRender();
+    }
+    if (save) saveLanding();
   });
+
+  async function saveLanding() {
+    if (!state.landing || state.saveLoading) return;
+    state.saveLoading = true;
+    state.saveError = "";
+    state.saveNotice = "";
+    requestRender();
+    const pages = state.landing.pages.map((page) => ({
+      persona_key: page.persona_key,
+      components: page.components.map((component) => ({
+        instance_id: component.instance_id,
+        template_id: component.template_id,
+        html: component.html,
+        hidden: component.hidden,
+      })),
+    }));
+    try {
+      state.landing = await window.LandingAPI.save(state.landing.landing_id, pages);
+      sessionStorage.removeItem(`landingDraft:${state.landing.landing_id}`);
+      state.saveNotice = "모든 페르소나 페이지를 저장했습니다.";
+    } catch (error) {
+      state.saveError = error.message;
+    } finally {
+      state.saveLoading = false;
+      requestRender();
+    }
+  }
 
   function displayAssetUrl(value) {
     if (!value?.startsWith("asset://")) return value || "";
