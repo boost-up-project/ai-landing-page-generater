@@ -22,6 +22,7 @@
     saveError: "",
     saveNotice: "",
     previewOpen: false,
+    restoreAttempted: false,
   };
 
   function escapeHTML(value = "") {
@@ -328,6 +329,12 @@
   }
 
   function mount(root) {
+    const landingId = new URLSearchParams(window.location.search).get("landingId")
+      || sessionStorage.getItem("landingId");
+    if (!state.landing && !state.loading && !state.error && !state.restoreAttempted && landingId) {
+      restore(landingId);
+      return;
+    }
     root.querySelectorAll("[data-component-frame]").forEach((frame) => {
       frame.addEventListener("load", () => {
         frame.style.height = `${Math.max(240, frame.contentDocument?.documentElement.scrollHeight || 0)}px`;
@@ -346,6 +353,7 @@
     window.dispatchEvent(new CustomEvent("landing-editor-change"));
     try {
       state.landing = await window.LandingAPI.create(projectId);
+      rememberLanding(state.landing.landing_id);
       state.activePersonaIndex = 0;
       state.history = [];
       state.future = [];
@@ -361,6 +369,42 @@
       state.loading = false;
       requestRender();
     }
+  }
+
+  async function restore(landingId) {
+    state.restoreAttempted = true;
+    state.loading = true;
+    state.error = "";
+    requestRender();
+    try {
+      state.landing = await window.LandingAPI.get(landingId);
+      state.projectId = state.landing.project_id;
+      state.activePersonaIndex = 0;
+      const storedDraft = sessionStorage.getItem(`landingDraft:${landingId}`);
+      if (storedDraft) {
+        try {
+          const pages = JSON.parse(storedDraft);
+          if (Array.isArray(pages) && pages.length === state.landing.pages.length) {
+            state.landing.pages = pages;
+          }
+        } catch (error) {
+          sessionStorage.removeItem(`landingDraft:${landingId}`);
+        }
+      }
+      rememberLanding(landingId);
+    } catch (error) {
+      state.error = error.message;
+    } finally {
+      state.loading = false;
+      requestRender();
+    }
+  }
+
+  function rememberLanding(landingId) {
+    sessionStorage.setItem("landingId", landingId);
+    const url = new URL(window.location.href);
+    url.searchParams.set("landingId", landingId);
+    window.history.replaceState(null, "", url);
   }
 
   window.addEventListener("message", (event) => {
