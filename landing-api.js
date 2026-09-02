@@ -48,6 +48,23 @@
       });
     },
 
+    async uploadAsset(landingId, file) {
+      const formData = new FormData();
+      formData.append("file", file, file.name);
+      return request(`/landings/${landingId}/assets/upload`, {
+        method: "POST",
+        body: formData,
+      });
+    },
+
+    async generateAsset(landingId, payload) {
+      return request(`/landings/${landingId}/assets/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+
     assetUrl(landingId, filename) {
       if (!baseUrl) return "";
       return `${baseUrl}/landings/${encodeURIComponent(landingId)}/assets/${encodeURIComponent(filename)}`;

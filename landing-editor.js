@@ -15,6 +15,9 @@
     copyCandidates: [],
     candidateLoading: false,
     candidateError: "",
+    imagePrompt: "",
+    assetLoading: false,
+    assetError: "",
   };
 
   function escapeHTML(value = "") {
@@ -105,7 +108,9 @@
             editableTypeIndex: editableNodes().filter((item) => item.dataset.editable === target.dataset.editable).indexOf(target),
             editableType: target.dataset.editable,
             value: target.dataset.editable === "image" ? target.getAttribute("src") || "" : target.textContent || "",
-            alt: target.getAttribute("alt") || ""
+            alt: target.getAttribute("alt") || "",
+            width: Math.round(target.getBoundingClientRect().width),
+            height: Math.round(target.getBoundingClientRect().height)
           }, "*");
         });
         new ResizeObserver(sendHeight).observe(document.documentElement);
@@ -158,6 +163,12 @@
         </div>`;
     }
     const isImage = state.selectedEditable.editableType === "image";
+    const selectedImageUrl = isImage ? displayAssetUrl(state.selectedEditable.value) : "";
+    const assetItems = (state.landing?.assets || []).map((asset) => `
+      <button type="button" class="landing-asset-item" data-select-asset="${escapeHTML(asset.filename)}" title="${escapeHTML(asset.filename)}">
+        <img src="${escapeHTML(window.LandingAPI.assetUrl(state.landing.landing_id, asset.filename))}" alt="" />
+        <span>${escapeHTML(asset.filename)}</span>
+      </button>`).join("");
     const copyCandidates = state.copyCandidates.map((candidate, index) => `
       <button type="button" class="landing-copy-candidate" data-copy-candidate="${index}">
         <span>후보 ${index + 1}</span>
@@ -170,10 +181,28 @@
       </div>
       <div class="landing-inspector__body">
         ${isImage ? `
+          <div class="landing-current-image">
+            <img src="${escapeHTML(selectedImageUrl)}" alt="${escapeHTML(state.selectedEditable.alt)}" />
+          </div>
           <label>대체 텍스트
             <textarea data-editable-draft>${escapeHTML(state.selectedEditable.alt)}</textarea>
           </label>
-          <p>이미지 교체 기능은 다음 구현 단위에서 연결됩니다.</p>
+          <button type="button" class="landing-button landing-button--secondary" data-apply-image-alt>대체 텍스트 적용</button>
+          <div class="landing-inspector__divider"></div>
+          <div class="landing-inspector__section-title"><strong>이미지 에셋</strong><span>선택 즉시 적용</span></div>
+          <div class="landing-asset-grid">${assetItems || '<p>등록된 에셋이 없습니다.</p>'}</div>
+          <label class="landing-upload-button">
+            <span>새 이미지 업로드</span>
+            <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" data-upload-image />
+          </label>
+          <div class="landing-inspector__divider"></div>
+          <label>AI 이미지 요청
+            <textarea data-image-prompt placeholder="예: 자연광이 드는 따뜻한 분위기의 작은 거실">${escapeHTML(state.imagePrompt)}</textarea>
+          </label>
+          <button type="button" class="landing-button landing-button--primary" data-generate-image ${state.assetLoading ? "disabled" : ""}>
+            ${state.assetLoading ? "이미지 생성 중..." : "새 이미지 생성"}
+          </button>
+          ${state.assetError ? `<p class="landing-inspector__error">${escapeHTML(state.assetError)}</p>` : ""}
         ` : `
           <label>현재 문구
             <textarea data-editable-draft>${escapeHTML(state.selectedEditable.value)}</textarea>
@@ -289,6 +318,7 @@
       state.future = [];
       state.copyPrompt = "";
       state.copyCandidates = [];
+      state.imagePrompt = "";
       persistDraft();
     } catch (error) {
       state.error = error.message;
@@ -309,6 +339,8 @@
       state.copyPrompt = "";
       state.copyCandidates = [];
       state.candidateError = "";
+      state.imagePrompt = "";
+      state.assetError = "";
       requestRender();
     }
   });
@@ -323,6 +355,9 @@
     const applyCopy = event.target.closest("[data-apply-copy]");
     const generateCopy = event.target.closest("[data-generate-copy]");
     const copyCandidate = event.target.closest("[data-copy-candidate]");
+    const selectAsset = event.target.closest("[data-select-asset]");
+    const applyImageAlt = event.target.closest("[data-apply-image-alt]");
+    const generateImage = event.target.closest("[data-generate-image]");
     if (personaTab) {
       state.activePersonaIndex = Number(personaTab.dataset.landingPersona);
       state.selectedInstanceId = "";
@@ -368,7 +403,133 @@
       if (value !== undefined) applySelectedCopy(value);
     }
     if (generateCopy) generateCopyCandidates();
+    if (selectAsset) applySelectedImage(`asset://${selectAsset.dataset.selectAsset}`);
+    if (applyImageAlt) applySelectedImage(state.selectedEditable?.value || "");
+    if (generateImage) generateImageAsset();
   });
+
+  function displayAssetUrl(value) {
+    if (!value?.startsWith("asset://")) return value || "";
+    return window.LandingAPI.assetUrl(
+      state.landing.landing_id,
+      value.slice("asset://".length),
+    );
+  }
+
+  function normalizedAssetValue(value) {
+    if (value?.startsWith("asset://")) return value;
+    try {
+      const url = new URL(value, window.location.href);
+      const marker = "/assets/";
+      const markerIndex = url.pathname.lastIndexOf(marker);
+      if (markerIndex >= 0) {
+        return `asset://${decodeURIComponent(url.pathname.slice(markerIndex + marker.length))}`;
+      }
+    } catch (error) {
+      return value;
+    }
+    return value;
+  }
+
+  function escapeAttribute(value) {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;");
+  }
+
+  function setTagAttribute(tag, name, value) {
+    const pattern = new RegExp(`\\b${name}\\s*=\\s*(["'])[\\s\\S]*?\\1`, "i");
+    const attribute = `${name}="${escapeAttribute(value)}"`;
+    if (pattern.test(tag)) return tag.replace(pattern, attribute);
+    const closing = tag.trimEnd().endsWith("/>") ? "/>" : ">";
+    return `${tag.trimEnd().slice(0, -closing.length).trimEnd()} ${attribute}${closing}`;
+  }
+
+  function replaceImageAt(source, typeIndex, src, alt) {
+    const pattern = /<img\b(?=[^>]*\bdata-editable\s*=\s*['"]image['"])[^>]*>/gi;
+    let index = 0;
+    let replaced = false;
+    const html = source.replace(pattern, (tag) => {
+      if (index++ !== typeIndex) return tag;
+      replaced = true;
+      return setTagAttribute(setTagAttribute(tag, "src", src), "alt", alt);
+    });
+    return replaced ? html : null;
+  }
+
+  function applySelectedImage(value) {
+    const selected = state.selectedEditable;
+    if (!selected || selected.editableType !== "image") return;
+    const component = activePage()?.components.find(
+      (item) => item.instance_id === selected.instanceId,
+    );
+    if (!component) return;
+    const assetValue = normalizedAssetValue(value);
+    const updated = replaceImageAt(
+      component.html,
+      selected.editableTypeIndex,
+      assetValue,
+      selected.alt,
+    );
+    if (updated === null) {
+      state.assetError = "선택한 이미지 영역을 찾을 수 없습니다.";
+      requestRender();
+      return;
+    }
+    commitMutation(() => {
+      component.html = updated;
+      state.selectedEditable.value = assetValue;
+      state.assetError = "";
+    }, { preserveSelection: true });
+  }
+
+  function closestAspectRatio(width, height) {
+    const options = [
+      ["1:1", 1], ["2:3", 2 / 3], ["3:2", 3 / 2], ["3:4", 3 / 4],
+      ["4:3", 4 / 3], ["4:5", 4 / 5], ["5:4", 5 / 4], ["9:16", 9 / 16],
+      ["16:9", 16 / 9], ["21:9", 21 / 9],
+    ];
+    const ratio = width > 0 && height > 0 ? width / height : 16 / 9;
+    return options.reduce((closest, option) => (
+      Math.abs(option[1] - ratio) < Math.abs(closest[1] - ratio) ? option : closest
+    ))[0];
+  }
+
+  async function generateImageAsset() {
+    const selected = state.selectedEditable;
+    const page = activePage();
+    if (!selected || selected.editableType !== "image" || !page || state.assetLoading) return;
+    if (!state.imagePrompt.trim()) {
+      state.assetError = "생성할 이미지에 대한 요청을 입력해 주세요.";
+      requestRender();
+      return;
+    }
+    state.assetLoading = true;
+    state.assetError = "";
+    requestRender();
+    try {
+      const asset = await window.LandingAPI.generateAsset(
+        state.landing.landing_id,
+        {
+          persona_key: page.persona_key,
+          instance_id: selected.instanceId,
+          editable_index: selected.editableTypeIndex,
+          prompt: state.imagePrompt.trim(),
+          alt: selected.alt,
+          aspect_ratio: closestAspectRatio(selected.width, selected.height),
+        },
+      );
+      state.landing.assets.push(asset);
+      applySelectedImage(`asset://${asset.filename}`);
+    } catch (error) {
+      state.assetError = error.message;
+    } finally {
+      state.assetLoading = false;
+      requestRender();
+    }
+  }
 
   function replaceCopyAt(source, typeIndex, value) {
     const pattern = /(<([a-z][\w:-]*)\b(?=[^>]*\bdata-editable\s*=\s*['"]copy['"])[^>]*>)([\s\S]*?)(<\/\2\s*>)/gi;
@@ -440,6 +601,26 @@
       }
     }
     if (event.target.matches("[data-copy-prompt]")) state.copyPrompt = event.target.value;
+    if (event.target.matches("[data-image-prompt]")) state.imagePrompt = event.target.value;
+  });
+
+  document.addEventListener("change", async (event) => {
+    const input = event.target.closest("[data-upload-image]");
+    const file = input?.files?.[0];
+    if (!file || state.assetLoading) return;
+    state.assetLoading = true;
+    state.assetError = "";
+    requestRender();
+    try {
+      const asset = await window.LandingAPI.uploadAsset(state.landing.landing_id, file);
+      state.landing.assets.push(asset);
+      applySelectedImage(`asset://${asset.filename}`);
+    } catch (error) {
+      state.assetError = error.message;
+    } finally {
+      state.assetLoading = false;
+      requestRender();
+    }
   });
 
   function addTemplateAt(templateId, index) {
