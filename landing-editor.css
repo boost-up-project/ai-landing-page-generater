@@ -342,6 +342,27 @@ body[data-screen="landing-editor"] .page {
   font-size: 10px;
 }
 
+.landing-component__layout {
+  display: flex;
+  height: 30px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 7px;
+  color: #fff;
+  font-size: 10px;
+}
+
+.landing-component__layout select {
+  max-width: 88px;
+  height: 22px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #1d2834;
+  font-size: 10px;
+}
+
 .landing-component__toolbar button:hover {
   background: rgba(0, 0, 0, 0.12);
 }

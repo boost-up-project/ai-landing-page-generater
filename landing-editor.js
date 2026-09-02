@@ -137,11 +137,19 @@
   }
 
   function componentCard(component, index, count) {
+    const layoutOptions = component.layout_options?.length ? component.layout_options : ["source"];
+    const layoutControl = layoutOptions.length > 1 ? `
+      <label class="landing-component__layout">배치
+        <select data-component-layout aria-label="${escapeHTML(component.name)} 배치">
+          ${layoutOptions.map((option) => `<option value="${escapeHTML(option)}" ${option === component.layout_variant ? "selected" : ""}>${escapeHTML(layoutLabel(option))}</option>`).join("")}
+        </select>
+      </label>` : "";
     return `
       <article class="landing-component ${component.hidden ? "landing-component--hidden" : ""} ${state.selectedInstanceId === component.instance_id ? "landing-component--selected" : ""}"
         data-landing-component="${escapeHTML(component.instance_id)}">
         <div class="landing-component__label">${escapeHTML(component.name)}</div>
         <div class="landing-component__toolbar" aria-label="${escapeHTML(component.name)} 설정">
+          ${layoutControl}
           <button type="button" data-component-action="drag" title="드래그해서 이동">⋮⋮</button>
           <button type="button" data-component-action="up" ${index === 0 ? "disabled" : ""} title="위로 이동">↑</button>
           <button type="button" data-component-action="down" ${index === count - 1 ? "disabled" : ""} title="아래로 이동">↓</button>
@@ -158,6 +166,16 @@
             srcdoc="${escapeHTML(frameDocument(component))}"
           ></iframe>`}
       </article>`;
+  }
+
+  function layoutLabel(value) {
+    const labels = {
+      source: "원본", "media-left": "이미지 왼쪽", "media-right": "이미지 오른쪽",
+      "media-top": "이미지 위", inline: "가로형", centered: "가운데",
+      "proof-first": "근거 우선", cards: "카드형", stacked: "세로형",
+      compact: "압축형", spacious: "여백형",
+    };
+    return labels[value] || value;
   }
 
   function libraryMarkup() {
@@ -512,6 +530,7 @@
         instance_id: component.instance_id,
         template_id: component.template_id,
         html: component.html,
+        layout_variant: component.layout_variant || "source",
         hidden: component.hidden,
       })),
     }));
@@ -564,6 +583,12 @@
     if (pattern.test(tag)) return tag.replace(pattern, attribute);
     const closing = tag.trimEnd().endsWith("/>") ? "/>" : ">";
     return `${tag.trimEnd().slice(0, -closing.length).trimEnd()} ${attribute}${closing}`;
+  }
+
+  function setComponentLayout(source, layoutVariant) {
+    return source.replace(/<[a-z][\w:-]*\b[^>]*>/i, (tag) => (
+      setTagAttribute(tag, "data-layout-variant", layoutVariant)
+    ));
   }
 
   function replaceImageAt(source, typeIndex, src, alt) {
@@ -724,6 +749,19 @@
   });
 
   document.addEventListener("change", async (event) => {
+    const layout = event.target.closest("[data-component-layout]");
+    if (layout) {
+      const card = layout.closest("[data-landing-component]");
+      const component = activePage()?.components.find(
+        (item) => item.instance_id === card?.dataset.landingComponent,
+      );
+      if (!component || !(component.layout_options || ["source"]).includes(layout.value)) return;
+      commitMutation(() => {
+        component.layout_variant = layout.value;
+        component.html = setComponentLayout(component.html, layout.value);
+      }, { preserveSelection: true });
+      return;
+    }
     const input = event.target.closest("[data-upload-image]");
     const file = input?.files?.[0];
     if (!file || state.assetLoading) return;
@@ -753,6 +791,8 @@
         name: template.name,
         category: template.category,
         html: template.html,
+        layout_variant: "source",
+        layout_options: template.layout_options || ["source"],
         hidden: false,
       });
     });
