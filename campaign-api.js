@@ -28,8 +28,9 @@
   }
 
   window.CampaignAPI = {
-    async analyze({ strategyFile, componentFiles, assetFiles }) {
+    async analyze({ projectId, strategyFile, componentFiles, assetFiles }) {
       const formData = new FormData();
+      formData.append("project_id", projectId);
       formData.append("strategy_file", strategyFile, strategyFile.name);
       componentFiles.forEach((file) => {
         formData.append("component_files", file, file.name);
