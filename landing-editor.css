@@ -239,6 +239,63 @@ body[data-screen="landing-editor"] .page {
   outline-offset: -2px;
 }
 
+.landing-fixed-header {
+  position: relative;
+  z-index: 1;
+  border-bottom: 1px solid #d1d9e0;
+  background: #fff;
+}
+
+.landing-canvas__section-label {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border-bottom: 1px solid #e5e8eb;
+  background: #f6f8fa;
+}
+
+.landing-canvas__section-label strong {
+  color: #59636e;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.landing-canvas__section-label span {
+  color: #818b98;
+  font-size: 10px;
+}
+
+.landing-canvas__section-label--body {
+  border-top: 1px solid #d1d9e0;
+}
+
+.landing-component--fixed {
+  min-height: 0;
+  outline: 0;
+}
+
+.landing-component--fixed:hover {
+  z-index: auto;
+  outline: 0;
+}
+
+.landing-component__fixed-label {
+  position: absolute;
+  z-index: 4;
+  top: 8px;
+  right: 10px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: rgba(31, 35, 40, 0.72);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
 .landing-drop-zone {
   position: relative;
   z-index: 4;

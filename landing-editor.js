@@ -129,11 +129,28 @@
   }
 
   function previewDocument() {
-    const content = (activePage()?.components || [])
-      .filter((component) => !component.hidden)
+    const page = activePage();
+    const content = [
+      ...(page?.header_components || []),
+      ...(page?.components || []).filter((component) => !component.hidden),
+    ]
       .map((component) => replaceAssetUrls(component.html))
       .join("\n");
     return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>${content}</body></html>`;
+  }
+
+  function fixedHeaderCard(component) {
+    return `
+      <article class="landing-component landing-component--fixed" aria-label="고정 Header: ${escapeHTML(component.name)}">
+        <div class="landing-component__fixed-label">Fixed Header · ${escapeHTML(component.name)}</div>
+        <iframe
+          class="landing-component__frame"
+          data-component-frame="${escapeHTML(component.instance_id)}"
+          title="${escapeHTML(component.name)} 고정 Header 미리보기"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+          srcdoc="${escapeHTML(frameDocument(component))}"
+        ></iframe>
+      </article>`;
   }
 
   function componentCard(component, index, count) {
@@ -262,6 +279,12 @@
         data-landing-persona="${index}" role="tab" aria-selected="${index === state.activePersonaIndex}">
         ${escapeHTML(item.persona_name)}
       </button>`).join("");
+    const headerComponents = page.header_components || [];
+    const header = headerComponents.length ? `
+      <section class="landing-fixed-header" aria-label="공통 고정 Header">
+        <div class="landing-canvas__section-label"><strong>Header</strong><span>모든 페르소나에 공통 적용</span></div>
+        ${headerComponents.map((component) => fixedHeaderCard(component)).join("")}
+      </section>` : "";
     const components = [
       '<div class="landing-drop-zone" data-drop-index="0"><span>여기에 컴포넌트 추가</span></div>',
       ...page.components.flatMap((component, index) => [
@@ -306,11 +329,13 @@
         <div class="landing-editor__tabs" role="tablist" aria-label="페르소나별 랜딩 페이지">${tabs}</div>
         <div class="landing-editor__workspace">
           <aside class="landing-panel landing-panel--library">
-            <div class="landing-panel__title"><strong>Components</strong><span>${state.landing.component_library.length}</span></div>
+            <div class="landing-panel__title"><strong>Body Components</strong><span>${state.landing.component_library.length}</span></div>
             <div class="landing-library">${libraryMarkup()}</div>
           </aside>
           <main class="landing-canvas-wrap">
             <div class="landing-canvas" data-landing-canvas>
+              ${header}
+              <div class="landing-canvas__section-label landing-canvas__section-label--body"><strong>Body</strong><span>페르소나별 구성 및 편집</span></div>
               ${components}
             </div>
           </main>
