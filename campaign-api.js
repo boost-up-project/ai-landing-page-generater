@@ -31,16 +31,25 @@
   }
 
   window.CampaignAPI = {
-    async analyze({ projectId, strategyFile, componentFiles, assetFiles }) {
+    async analyze({
+      projectId, strategyFile, componentFiles, styleFiles = [], assetFiles, bundleFiles = [], referenceUrl,
+    }) {
       const formData = new FormData();
       formData.append("project_id", projectId);
       formData.append("strategy_file", strategyFile, strategyFile.name);
       componentFiles.forEach((file) => {
         formData.append("component_files", file, file.name);
       });
+      styleFiles.forEach((file) => {
+        formData.append("style_files", file, file.name);
+      });
       assetFiles.forEach((file) => {
         formData.append("asset_files", file, file.name);
       });
+      bundleFiles.forEach((file) => {
+        formData.append("bundle_files", file, file.name);
+      });
+      if (referenceUrl) formData.append("reference_url", referenceUrl);
       return request("/campaigns", { method: "POST", body: formData });
     },
 

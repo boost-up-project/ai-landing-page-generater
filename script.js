@@ -114,11 +114,23 @@ const campaignUploadFields = [
     accept: "text/html,.html,.htm",
     extensions: [".html", ".htm"],
     placeholder: "HTML 웹 컴포넌트를 첨부하세요.",
-    caption: "저장할 HTML 웹 컴포넌트를 여러 개 첨부할 수 있습니다.",
+    caption: "필수 항목입니다. 하나의 HTML 문서도 가로 섹션 단위로 나누어 모두 사용합니다.",
     formatLabel: "HTML",
     multiple: true,
     maxFiles: 20,
     maxSize: 5 * 1024 * 1024,
+  },
+  {
+    key: "styles",
+    title: "CSS Styles (Optional)",
+    accept: "text/css,.css",
+    extensions: [".css"],
+    placeholder: "HTML에 연결된 CSS 파일을 첨부하세요.",
+    caption: "선택 항목입니다. 첨부한 CSS는 분리된 모든 컴포넌트에 함께 적용됩니다.",
+    formatLabel: "CSS",
+    multiple: true,
+    maxFiles: 20,
+    maxSize: 2 * 1024 * 1024,
   },
   {
     key: "assets",
@@ -130,6 +142,18 @@ const campaignUploadFields = [
     formatLabel: "PNG, JPG, JPEG, GIF, WEBP",
     multiple: true,
     maxFiles: 50,
+    maxSize: 20 * 1024 * 1024,
+  },
+  {
+    key: "bundles",
+    title: "Asset Bundle (Optional)",
+    accept: "application/zip,.zip",
+    extensions: [".zip"],
+    placeholder: "HTML, CSS, 이미지가 담긴 ZIP을 첨부하세요.",
+    caption: "선택 항목입니다. ZIP 내부의 HTML, CSS, 이미지를 자동으로 분류합니다.",
+    formatLabel: "ZIP",
+    multiple: true,
+    maxFiles: 5,
     maxSize: 20 * 1024 * 1024,
   },
 ];
@@ -169,6 +193,7 @@ const campaignState = {
   markdown: "",
   error: "",
   notice: "",
+  referenceUrl: "",
 };
 const personaState = {
   inputs: [""],
@@ -662,7 +687,18 @@ function campaignInputMarkup(isUploaded) {
     <div class="screen-content">
       ${headerMarkup("Campaign Knowledge Input", "캠페인 정보를 입력해 주세요.", [1, 0.5, 0, 0, 0])}
       ${feedbackMarkup()}
-      <form class="input-form campaign-form ${isUploaded ? "input-form--uploaded" : ""}">${sectionMarkup}</form>
+      <form class="input-form campaign-form ${isUploaded ? "input-form--uploaded" : ""}">
+        <section class="file-section">
+          <div class="file-section__heading"><h2>Reference URL <span class="field-optional">Optional</span></h2></div>
+          <div class="file-section__body">
+            <label class="reference-url-field">공개 웹페이지 URL
+              <input type="url" inputmode="url" placeholder="https://example.com" value="${escapeHTML(campaignState.referenceUrl)}" data-campaign-reference-url />
+            </label>
+            <p class="field-caption">로그인 없이 접속 가능한 공개 URL만 지원합니다. URL은 레이아웃 참고용이며, HTML이 반드시 필요합니다.</p>
+          </div>
+        </section>
+        ${sectionMarkup}
+      </form>
     </div>`;
 }
 
@@ -1040,6 +1076,16 @@ async function analyzeCampaign() {
     routeTo(4);
     return;
   }
+  if (!campaignState.files.components.length) {
+    campaignState.error = "랜딩에 사용할 HTML 파일을 한 개 이상 첨부해 주세요.";
+    routeTo(4);
+    return;
+  }
+  if (campaignState.referenceUrl && !/^https?:\/\//i.test(campaignState.referenceUrl.trim())) {
+    campaignState.error = "Reference URL은 http:// 또는 https://로 시작해야 합니다.";
+    routeTo(4);
+    return;
+  }
   campaignState.error = "";
   campaignState.notice = "";
   routeTo(6);
@@ -1048,7 +1094,10 @@ async function analyzeCampaign() {
       projectId,
       strategyFile,
       componentFiles: campaignState.files.components,
+      styleFiles: campaignState.files.styles,
       assetFiles: campaignState.files.assets,
+      bundleFiles: campaignState.files.bundles,
+      referenceUrl: campaignState.referenceUrl.trim(),
     });
     routeTo(7);
   } catch (error) {
@@ -1213,6 +1262,11 @@ nextButton.addEventListener("click", async () => {
   if (screen === "campaign-input") {
     if (!campaignState.files.strategy.length) {
       campaignState.error = "캠페인 전략 PDF 1개를 첨부해 주세요.";
+      render();
+      return;
+    }
+    if (!campaignState.files.components.length) {
+      campaignState.error = "랜딩에 사용할 HTML 파일을 한 개 이상 첨부해 주세요.";
       render();
       return;
     }
@@ -1425,6 +1479,10 @@ app.addEventListener("change", (event) => {
 app.addEventListener("input", (event) => {
   if (event.target.matches("[data-brand-path]")) brandState.error = "";
   if (event.target.matches("[data-campaign-path]")) campaignState.error = "";
+  if (event.target.matches("[data-campaign-reference-url]")) {
+    campaignState.referenceUrl = event.target.value;
+    campaignState.error = "";
+  }
   if (event.target.matches("[data-persona-input]")) {
     personaState.inputs[Number(event.target.dataset.personaInput)] = event.target.value;
     personaState.error = "";
