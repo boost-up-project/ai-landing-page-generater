@@ -218,6 +218,48 @@ body[data-screen="landing-editor"] .page {
   outline-offset: -2px;
 }
 
+.landing-drop-zone {
+  position: relative;
+  z-index: 4;
+  height: 0;
+  transition: height 120ms ease;
+}
+
+.landing-drop-zone span {
+  position: absolute;
+  inset: 50% 12px auto;
+  display: none;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-50%);
+  border: 1px dashed #0088ff;
+  border-radius: 6px;
+  background: #e9f2fa;
+  color: #0088ff;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.landing-drop-zone--active {
+  height: 38px;
+}
+
+.landing-drop-zone--active span {
+  display: flex;
+}
+
+.landing-canvas > .landing-drop-zone:first-child:last-child {
+  height: 120px;
+}
+
+.landing-canvas > .landing-drop-zone:first-child:last-child span {
+  display: flex;
+  border-color: #bac1c7;
+  background: #f6f8fa;
+  color: #818b98;
+}
+
 .landing-component:hover,
 .landing-component--selected {
   z-index: 2;

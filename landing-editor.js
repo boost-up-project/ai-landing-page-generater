@@ -7,6 +7,10 @@
     selectedInstanceId: "",
     selectedEditable: null,
     projectId: "",
+    history: [],
+    future: [],
+    draggedInstanceId: "",
+    draggedTemplateId: "",
   };
 
   function escapeHTML(value = "") {
@@ -20,6 +24,52 @@
 
   function activePage() {
     return state.landing?.pages?.[state.activePersonaIndex] || null;
+  }
+
+  function requestRender() {
+    window.dispatchEvent(new CustomEvent("landing-editor-change"));
+  }
+
+  function clonePages(pages = state.landing?.pages || []) {
+    return structuredClone(pages);
+  }
+
+  function persistDraft() {
+    if (!state.landing?.landing_id) return;
+    sessionStorage.setItem(
+      `landingDraft:${state.landing.landing_id}`,
+      JSON.stringify(state.landing.pages),
+    );
+  }
+
+  function commitMutation(mutator) {
+    if (!state.landing) return;
+    state.history.push(clonePages());
+    if (state.history.length > 50) state.history.shift();
+    state.future = [];
+    mutator();
+    state.selectedInstanceId = "";
+    state.selectedEditable = null;
+    persistDraft();
+    requestRender();
+  }
+
+  function undo() {
+    const previous = state.history.pop();
+    if (!previous) return;
+    state.future.push(clonePages());
+    state.landing.pages = previous;
+    persistDraft();
+    requestRender();
+  }
+
+  function redo() {
+    const next = state.future.pop();
+    if (!next) return;
+    state.history.push(clonePages());
+    state.landing.pages = next;
+    persistDraft();
+    requestRender();
   }
 
   function replaceAssetUrls(html) {
@@ -86,7 +136,7 @@
     const templates = state.landing?.component_library || [];
     if (!templates.length) return '<p class="landing-panel__empty">사용 가능한 컴포넌트가 없습니다.</p>';
     return templates.map((template) => `
-      <button type="button" class="landing-library-item" data-add-template="${escapeHTML(template.template_id)}">
+      <button type="button" class="landing-library-item" data-add-template="${escapeHTML(template.template_id)}" draggable="true">
         <span class="landing-library-item__preview">${escapeHTML(template.category || "Component")}</span>
         <strong>${escapeHTML(template.name)}</strong>
       </button>`).join("");
@@ -121,9 +171,13 @@
         data-landing-persona="${index}" role="tab" aria-selected="${index === state.activePersonaIndex}">
         ${escapeHTML(item.persona_name)}
       </button>`).join("");
-    const components = page.components.map((component, index) => (
-      componentCard(component, index, page.components.length)
-    )).join("");
+    const components = [
+      '<div class="landing-drop-zone" data-drop-index="0"><span>여기에 컴포넌트 추가</span></div>',
+      ...page.components.flatMap((component, index) => [
+        componentCard(component, index, page.components.length),
+        `<div class="landing-drop-zone" data-drop-index="${index + 1}"><span>여기에 컴포넌트 추가</span></div>`,
+      ]),
+    ].join("");
     return `
       <section class="landing-editor" aria-label="랜딩 페이지 편집기">
         <header class="landing-editor__topbar">
@@ -132,8 +186,8 @@
             <span>${escapeHTML(page.persona_name)} 맞춤 페이지</span>
           </div>
           <div class="landing-editor__history">
-            <button type="button" data-history="undo" title="되돌리기" disabled>↶</button>
-            <button type="button" data-history="redo" title="다시 실행" disabled>↷</button>
+            <button type="button" data-history="undo" title="되돌리기" ${state.history.length ? "" : "disabled"}>↶</button>
+            <button type="button" data-history="redo" title="다시 실행" ${state.future.length ? "" : "disabled"}>↷</button>
           </div>
           <div class="landing-editor__actions">
             <button type="button" class="landing-button landing-button--secondary" data-preview>미리보기</button>
@@ -148,7 +202,7 @@
           </aside>
           <main class="landing-canvas-wrap">
             <div class="landing-canvas" data-landing-canvas>
-              ${components || '<p class="landing-canvas__empty">왼쪽 목록에서 컴포넌트를 추가하세요.</p>'}
+              ${components}
             </div>
           </main>
           <aside class="landing-panel landing-panel--inspector">${inspectorMarkup()}</aside>
@@ -203,11 +257,14 @@
     try {
       state.landing = await window.LandingAPI.create(projectId);
       state.activePersonaIndex = 0;
+      state.history = [];
+      state.future = [];
+      persistDraft();
     } catch (error) {
       state.error = error.message;
     } finally {
       state.loading = false;
-      window.dispatchEvent(new CustomEvent("landing-editor-change"));
+      requestRender();
     }
   }
 
@@ -219,7 +276,7 @@
     if (event.data?.type === "landing-editable-select") {
       state.selectedInstanceId = event.data.instanceId;
       state.selectedEditable = event.data;
-      window.dispatchEvent(new CustomEvent("landing-editor-change"));
+      requestRender();
     }
   });
 
@@ -227,18 +284,127 @@
     const personaTab = event.target.closest("[data-landing-persona]");
     const closeInspector = event.target.closest("[data-close-inspector]");
     const retry = event.target.closest("[data-retry-landing]");
+    const historyButton = event.target.closest("[data-history]");
+    const componentAction = event.target.closest("[data-component-action]");
+    const addTemplate = event.target.closest("[data-add-template]");
     if (personaTab) {
       state.activePersonaIndex = Number(personaTab.dataset.landingPersona);
       state.selectedInstanceId = "";
       state.selectedEditable = null;
-      window.dispatchEvent(new CustomEvent("landing-editor-change"));
+      requestRender();
     }
     if (closeInspector) {
       state.selectedInstanceId = "";
       state.selectedEditable = null;
-      window.dispatchEvent(new CustomEvent("landing-editor-change"));
+      requestRender();
     }
     if (retry && state.projectId) create(state.projectId);
+    if (historyButton?.dataset.history === "undo") undo();
+    if (historyButton?.dataset.history === "redo") redo();
+    if (componentAction && componentAction.dataset.componentAction !== "drag") {
+      const card = componentAction.closest("[data-landing-component]");
+      const components = activePage()?.components;
+      const index = components?.findIndex((item) => item.instance_id === card?.dataset.landingComponent);
+      if (!components || index < 0) return;
+      const action = componentAction.dataset.componentAction;
+      if (action === "up" && index > 0) {
+        commitMutation(() => components.splice(index - 1, 0, components.splice(index, 1)[0]));
+      }
+      if (action === "down" && index < components.length - 1) {
+        commitMutation(() => components.splice(index + 1, 0, components.splice(index, 1)[0]));
+      }
+      if (action === "duplicate") {
+        commitMutation(() => {
+          const duplicate = structuredClone(components[index]);
+          duplicate.instance_id = crypto.randomUUID();
+          components.splice(index + 1, 0, duplicate);
+        });
+      }
+      if (action === "hide") {
+        commitMutation(() => { components[index].hidden = !components[index].hidden; });
+      }
+      if (action === "delete") commitMutation(() => components.splice(index, 1));
+    }
+    if (addTemplate) addTemplateAt(addTemplate.dataset.addTemplate, activePage()?.components.length || 0);
+  });
+
+  function addTemplateAt(templateId, index) {
+    const template = state.landing?.component_library.find((item) => item.template_id === templateId);
+    const components = activePage()?.components;
+    if (!template || !components) return;
+    commitMutation(() => {
+      components.splice(index, 0, {
+        instance_id: crypto.randomUUID(),
+        template_id: template.template_id,
+        name: template.name,
+        category: template.category,
+        html: template.html,
+        hidden: false,
+      });
+    });
+  }
+
+  document.addEventListener("dragstart", (event) => {
+    const handle = event.target.closest('[data-component-action="drag"]');
+    const template = event.target.closest("[data-add-template]");
+    if (handle) {
+      state.draggedInstanceId = handle.closest("[data-landing-component]")?.dataset.landingComponent || "";
+      state.draggedTemplateId = "";
+      event.dataTransfer?.setData("text/plain", state.draggedInstanceId);
+      if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+    }
+    if (template) {
+      state.draggedTemplateId = template.dataset.addTemplate;
+      state.draggedInstanceId = "";
+      event.dataTransfer?.setData("text/plain", state.draggedTemplateId);
+      if (event.dataTransfer) event.dataTransfer.effectAllowed = "copy";
+    }
+  });
+
+  document.addEventListener("dragover", (event) => {
+    const zone = event.target.closest("[data-drop-index]");
+    if (!zone || (!state.draggedInstanceId && !state.draggedTemplateId)) return;
+    event.preventDefault();
+    document.querySelectorAll(".landing-drop-zone--active").forEach((item) => {
+      item.classList.remove("landing-drop-zone--active");
+    });
+    zone.classList.add("landing-drop-zone--active");
+    if (event.dataTransfer) event.dataTransfer.dropEffect = state.draggedTemplateId ? "copy" : "move";
+  });
+
+  document.addEventListener("drop", (event) => {
+    const zone = event.target.closest("[data-drop-index]");
+    if (!zone) return;
+    event.preventDefault();
+    const destination = Number(zone.dataset.dropIndex);
+    if (state.draggedTemplateId) {
+      addTemplateAt(state.draggedTemplateId, destination);
+    } else if (state.draggedInstanceId) {
+      const components = activePage()?.components;
+      const source = components?.findIndex((item) => item.instance_id === state.draggedInstanceId);
+      if (components && source >= 0) {
+        const adjustedDestination = source < destination ? destination - 1 : destination;
+        if (source !== adjustedDestination) {
+          commitMutation(() => {
+            const [component] = components.splice(source, 1);
+            components.splice(adjustedDestination, 0, component);
+          });
+        }
+      }
+    }
+    state.draggedInstanceId = "";
+    state.draggedTemplateId = "";
+    document.querySelectorAll(".landing-drop-zone--active").forEach((item) => {
+      item.classList.remove("landing-drop-zone--active");
+    });
+  });
+
+  document.addEventListener("dragend", () => {
+    state.draggedInstanceId = "";
+    state.draggedTemplateId = "";
+    document.querySelectorAll(".landing-drop-zone--active").forEach((item) => {
+      item.classList.remove("landing-drop-zone--active");
+    });
   });
 
   window.LandingEditor = { create, markup, mount, state };
