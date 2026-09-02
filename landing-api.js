@@ -2,7 +2,10 @@
   const metaBaseUrl = document
     .querySelector('meta[name="api-base-url"]')
     ?.getAttribute("content");
-  const configuredBaseUrl = window.BRAND_API_BASE_URL || metaBaseUrl;
+  const localBaseUrl = ["127.0.0.1", "localhost"].includes(window.location.hostname)
+    ? "http://127.0.0.1:8000/api"
+    : "";
+  const configuredBaseUrl = window.BRAND_API_BASE_URL || metaBaseUrl || localBaseUrl;
   const baseUrl = configuredBaseUrl?.replace(/\/$/, "");
 
   async function request(path, options = {}) {
