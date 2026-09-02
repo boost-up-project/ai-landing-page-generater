@@ -11,6 +11,7 @@ const screens = [
   "persona-loading",
   "persona-check",
   "final-check",
+  "landing-editor",
 ];
 
 const brandUploadFields = [
@@ -877,9 +878,11 @@ function render() {
     "persona-loading": () => loadingMarkup("persona"),
     "persona-check": personaCheckMarkup,
     "final-check": finalCheckMarkup,
+    "landing-editor": () => window.LandingEditor.markup(),
   }[screen];
 
   app.innerHTML = renderScreen();
+  if (screen === "landing-editor") window.LandingEditor.mount(app);
   window.scrollTo(0, 0);
   updateNavigation(screen);
   if (screen === "persona-loading" && personaState.loadingPhase < personaState.inputs.length - 1) {
@@ -891,7 +894,7 @@ function render() {
 }
 
 function updateNavigation(screen) {
-  navigation.hidden = screen.endsWith("-loading");
+  navigation.hidden = screen.endsWith("-loading") || screen === "landing-editor";
   previousButton.hidden = currentIndex < 2;
   previousButton.disabled = false;
   previousButton.querySelector("span").textContent = screen === "final-check" ? "이전" : "Previous";
@@ -1182,7 +1185,12 @@ nextButton.addEventListener("click", async () => {
     await finalizePersonas();
     return;
   }
-  if (screen === "final-check") return;
+  if (screen === "final-check") {
+    routeTo(screens.indexOf("landing-editor"));
+    await window.LandingEditor.create(flowState.projectId);
+    render();
+    return;
+  }
   if (currentIndex < screens.length - 1) routeTo(currentIndex + 1);
 });
 
@@ -1395,6 +1403,10 @@ app.addEventListener("keydown", (event) => {
 window.addEventListener("hashchange", () => {
   currentIndex = getIndexFromHash();
   render();
+});
+
+window.addEventListener("landing-editor-change", () => {
+  if (screens[currentIndex] === "landing-editor") render();
 });
 
 if (!window.location.hash) window.history.replaceState(null, "", `#${screens[0]}`);

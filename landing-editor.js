@@ -1,0 +1,245 @@
+(function initializeLandingEditor() {
+  const state = {
+    landing: null,
+    loading: false,
+    error: "",
+    activePersonaIndex: 0,
+    selectedInstanceId: "",
+    selectedEditable: null,
+    projectId: "",
+  };
+
+  function escapeHTML(value = "") {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function activePage() {
+    return state.landing?.pages?.[state.activePersonaIndex] || null;
+  }
+
+  function replaceAssetUrls(html) {
+    if (!state.landing) return html;
+    return html.replaceAll(/asset:\/\/([^\s"'<>]+)/g, (_, filename) => (
+      window.LandingAPI.assetUrl(state.landing.landing_id, decodeURIComponent(filename))
+    ));
+  }
+
+  function frameDocument(component) {
+    const bridge = `
+      <script>
+        const sendHeight = () => parent.postMessage({
+          type: "landing-frame-height",
+          instanceId: ${JSON.stringify(component.instance_id)},
+          height: Math.max(document.body.scrollHeight, document.documentElement.scrollHeight)
+        }, "*");
+        const editableNodes = () => Array.from(document.querySelectorAll("[data-editable]"));
+        document.addEventListener("dblclick", (event) => {
+          const target = event.target.closest("[data-editable]");
+          if (!target) return;
+          event.preventDefault();
+          parent.postMessage({
+            type: "landing-editable-select",
+            instanceId: ${JSON.stringify(component.instance_id)},
+            editableIndex: editableNodes().indexOf(target),
+            editableType: target.dataset.editable,
+            value: target.dataset.editable === "image" ? target.getAttribute("src") || "" : target.textContent || "",
+            alt: target.getAttribute("alt") || ""
+          }, "*");
+        });
+        new ResizeObserver(sendHeight).observe(document.documentElement);
+        window.addEventListener("load", sendHeight);
+        setTimeout(sendHeight, 100);
+      <\/script>`;
+    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>${replaceAssetUrls(component.html)}${bridge}</body></html>`;
+  }
+
+  function componentCard(component, index, count) {
+    return `
+      <article class="landing-component ${component.hidden ? "landing-component--hidden" : ""} ${state.selectedInstanceId === component.instance_id ? "landing-component--selected" : ""}"
+        data-landing-component="${escapeHTML(component.instance_id)}">
+        <div class="landing-component__label">${escapeHTML(component.name)}</div>
+        <div class="landing-component__toolbar" aria-label="${escapeHTML(component.name)} 설정">
+          <button type="button" data-component-action="drag" draggable="true" title="드래그해서 이동">⋮⋮</button>
+          <button type="button" data-component-action="up" ${index === 0 ? "disabled" : ""} title="위로 이동">↑</button>
+          <button type="button" data-component-action="down" ${index === count - 1 ? "disabled" : ""} title="아래로 이동">↓</button>
+          <button type="button" data-component-action="duplicate" title="복제">복제</button>
+          <button type="button" data-component-action="hide" title="숨김">${component.hidden ? "표시" : "숨김"}</button>
+          <button type="button" data-component-action="delete" title="삭제">삭제</button>
+        </div>
+        ${component.hidden ? '<div class="landing-component__hidden-message">숨긴 컴포넌트</div>' : `
+          <iframe
+            class="landing-component__frame"
+            data-component-frame="${escapeHTML(component.instance_id)}"
+            title="${escapeHTML(component.name)} 미리보기"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+            srcdoc="${escapeHTML(frameDocument(component))}"
+          ></iframe>`}
+      </article>`;
+  }
+
+  function libraryMarkup() {
+    const templates = state.landing?.component_library || [];
+    if (!templates.length) return '<p class="landing-panel__empty">사용 가능한 컴포넌트가 없습니다.</p>';
+    return templates.map((template) => `
+      <button type="button" class="landing-library-item" data-add-template="${escapeHTML(template.template_id)}">
+        <span class="landing-library-item__preview">${escapeHTML(template.category || "Component")}</span>
+        <strong>${escapeHTML(template.name)}</strong>
+      </button>`).join("");
+  }
+
+  function inspectorMarkup() {
+    if (!state.selectedEditable) {
+      return `
+        <div class="landing-inspector__empty">
+          <strong>편집할 요소를 선택하세요</strong>
+          <p>캔버스의 이미지나 텍스트를 더블클릭하면 여기에서 변경할 수 있습니다.</p>
+        </div>`;
+    }
+    const isImage = state.selectedEditable.editableType === "image";
+    return `
+      <div class="landing-inspector__header">
+        <span>${isImage ? "이미지" : "카피"} 편집</span>
+        <button type="button" data-close-inspector aria-label="속성 패널 닫기">×</button>
+      </div>
+      <div class="landing-inspector__body">
+        <label>${isImage ? "대체 텍스트" : "현재 문구"}
+          <textarea data-editable-draft>${escapeHTML(isImage ? state.selectedEditable.alt : state.selectedEditable.value)}</textarea>
+        </label>
+        <p>후보 생성과 이미지 교체 기능은 다음 구현 단위에서 연결됩니다.</p>
+      </div>`;
+  }
+
+  function editorMarkup() {
+    const page = activePage();
+    const tabs = state.landing.pages.map((item, index) => `
+      <button type="button" class="landing-persona-tab ${index === state.activePersonaIndex ? "landing-persona-tab--active" : ""}"
+        data-landing-persona="${index}" role="tab" aria-selected="${index === state.activePersonaIndex}">
+        ${escapeHTML(item.persona_name)}
+      </button>`).join("");
+    const components = page.components.map((component, index) => (
+      componentCard(component, index, page.components.length)
+    )).join("");
+    return `
+      <section class="landing-editor" aria-label="랜딩 페이지 편집기">
+        <header class="landing-editor__topbar">
+          <div class="landing-editor__title">
+            <strong>Landing Page Editor</strong>
+            <span>${escapeHTML(page.persona_name)} 맞춤 페이지</span>
+          </div>
+          <div class="landing-editor__history">
+            <button type="button" data-history="undo" title="되돌리기" disabled>↶</button>
+            <button type="button" data-history="redo" title="다시 실행" disabled>↷</button>
+          </div>
+          <div class="landing-editor__actions">
+            <button type="button" class="landing-button landing-button--secondary" data-preview>미리보기</button>
+            <button type="button" class="landing-button landing-button--primary" data-save>저장</button>
+          </div>
+        </header>
+        <div class="landing-editor__tabs" role="tablist" aria-label="페르소나별 랜딩 페이지">${tabs}</div>
+        <div class="landing-editor__workspace">
+          <aside class="landing-panel landing-panel--library">
+            <div class="landing-panel__title"><strong>Components</strong><span>${state.landing.component_library.length}</span></div>
+            <div class="landing-library">${libraryMarkup()}</div>
+          </aside>
+          <main class="landing-canvas-wrap">
+            <div class="landing-canvas" data-landing-canvas>
+              ${components || '<p class="landing-canvas__empty">왼쪽 목록에서 컴포넌트를 추가하세요.</p>'}
+            </div>
+          </main>
+          <aside class="landing-panel landing-panel--inspector">${inspectorMarkup()}</aside>
+        </div>
+      </section>`;
+  }
+
+  function markup() {
+    if (state.loading) {
+      return `
+        <section class="landing-editor-state" aria-live="polite">
+          <img src="assets/spinner.svg" alt="" />
+          <h1>AI가 랜딩 페이지를 구성하고 있어요</h1>
+          <p>페르소나별로 컴포넌트와 카피, 이미지를 선택하고 있습니다.</p>
+        </section>`;
+    }
+    if (state.error) {
+      return `
+        <section class="landing-editor-state">
+          <h1>랜딩 페이지를 만들지 못했습니다</h1>
+          <p>${escapeHTML(state.error)}</p>
+          <button class="landing-button landing-button--primary" type="button" data-retry-landing>다시 시도</button>
+        </section>`;
+    }
+    if (!state.landing) {
+      return `
+        <section class="landing-editor-state">
+          <h1>생성된 랜딩 페이지가 없습니다</h1>
+          <p>최종 검토에서 랜딩 페이지 생성을 시작해 주세요.</p>
+        </section>`;
+    }
+    return editorMarkup();
+  }
+
+  function mount(root) {
+    root.querySelectorAll("[data-component-frame]").forEach((frame) => {
+      frame.addEventListener("load", () => {
+        frame.style.height = `${Math.max(240, frame.contentDocument?.documentElement.scrollHeight || 0)}px`;
+      });
+    });
+  }
+
+  async function create(projectId) {
+    if (!projectId) {
+      state.error = "프로젝트 정보를 찾을 수 없습니다.";
+      return;
+    }
+    state.projectId = projectId;
+    state.loading = true;
+    state.error = "";
+    window.dispatchEvent(new CustomEvent("landing-editor-change"));
+    try {
+      state.landing = await window.LandingAPI.create(projectId);
+      state.activePersonaIndex = 0;
+    } catch (error) {
+      state.error = error.message;
+    } finally {
+      state.loading = false;
+      window.dispatchEvent(new CustomEvent("landing-editor-change"));
+    }
+  }
+
+  window.addEventListener("message", (event) => {
+    if (event.data?.type === "landing-frame-height") {
+      const frame = document.querySelector(`[data-component-frame="${CSS.escape(event.data.instanceId)}"]`);
+      if (frame) frame.style.height = `${Math.max(240, Number(event.data.height) || 0)}px`;
+    }
+    if (event.data?.type === "landing-editable-select") {
+      state.selectedInstanceId = event.data.instanceId;
+      state.selectedEditable = event.data;
+      window.dispatchEvent(new CustomEvent("landing-editor-change"));
+    }
+  });
+
+  document.addEventListener("click", (event) => {
+    const personaTab = event.target.closest("[data-landing-persona]");
+    const closeInspector = event.target.closest("[data-close-inspector]");
+    const retry = event.target.closest("[data-retry-landing]");
+    if (personaTab) {
+      state.activePersonaIndex = Number(personaTab.dataset.landingPersona);
+      state.selectedInstanceId = "";
+      state.selectedEditable = null;
+      window.dispatchEvent(new CustomEvent("landing-editor-change"));
+    }
+    if (closeInspector) {
+      state.selectedInstanceId = "";
+      state.selectedEditable = null;
+      window.dispatchEvent(new CustomEvent("landing-editor-change"));
+    }
+    if (retry && state.projectId) create(state.projectId);
+  });
+
+  window.LandingEditor = { create, markup, mount, state };
+}());
