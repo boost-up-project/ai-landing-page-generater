@@ -24,7 +24,16 @@
     saveNotice: "",
     previewOpen: false,
     restoreAttempted: false,
+    zoom: 0.5,
+    previewZoom: 0.5,
+    componentQuery: "",
+    device: "desktop",
+    initialPages: [],
   };
+
+  const zoomMin = 0.5;
+  const zoomMax = 1.5;
+  const zoomStep = 0.1;
 
   function escapeHTML(value = "") {
     return String(value)
@@ -43,8 +52,30 @@
     window.dispatchEvent(new CustomEvent("landing-editor-change"));
   }
 
+  function clampZoom(value) {
+    return Math.min(zoomMax, Math.max(zoomMin, Number(value) || 1));
+  }
+
+  function zoomLabel(value) {
+    return `${Math.round(value * 100)}%`;
+  }
+
+  function zoomControlsMarkup(type, value) {
+    return `
+      <div class="landing-zoom" aria-label="${type === "preview" ? "미리보기" : "캔버스"} 확대/축소">
+        <button type="button" data-zoom="${type}:out" aria-label="축소">−</button>
+        <span>${zoomLabel(value)}</span>
+        <button type="button" data-zoom="${type}:in" aria-label="확대">＋</button>
+        <button type="button" data-zoom="${type}:reset">100%</button>
+      </div>`;
+  }
+
   function clonePages(pages = state.landing?.pages || []) {
     return structuredClone(pages);
+  }
+
+  function rememberInitialPages() {
+    state.initialPages = clonePages();
   }
 
   function persistDraft() {
@@ -105,7 +136,7 @@
           height: Math.max(document.body.scrollHeight, document.documentElement.scrollHeight)
         }, "*");
         const editableNodes = () => Array.from(document.querySelectorAll("[data-editable]"));
-        document.addEventListener("dblclick", (event) => {
+        document.addEventListener("click", (event) => {
           const target = event.target.closest("[data-editable]");
           if (!target) return;
           event.preventDefault();
@@ -115,7 +146,7 @@
             editableIndex: editableNodes().indexOf(target),
             editableTypeIndex: editableNodes().filter((item) => item.dataset.editable === target.dataset.editable).indexOf(target),
             editableType: target.dataset.editable,
-            value: target.dataset.editable === "image" ? target.getAttribute("src") || "" : target.textContent || "",
+            value: target.dataset.editable === "image" ? target.getAttribute("src") || "" : target.innerText || "",
             alt: target.getAttribute("alt") || "",
             width: Math.round(target.getBoundingClientRect().width),
             height: Math.round(target.getBoundingClientRect().height)
@@ -139,10 +170,28 @@
     return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>${content}</body></html>`;
   }
 
+  function exportDocument(page = activePage()) {
+    const content = [
+      ...(page?.header_components || []),
+      ...(page?.components || []).filter((component) => !component.hidden),
+    ]
+      .map((component) => replaceAssetUrls(component.html))
+      .join("\n");
+    return `<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHTML(page?.persona_name || "Landing Page")}</title>
+<!-- AI 의도: ${escapeHTML(page?.ai_intent || "").replaceAll("--", "-")} -->
+</head>
+<body>${content}</body>
+</html>`;
+  }
+
   function fixedHeaderCard(component) {
     return `
       <article class="landing-component landing-component--fixed" aria-label="고정 Header: ${escapeHTML(component.name)}">
-        <div class="landing-component__fixed-label">Fixed Header · ${escapeHTML(component.name)}</div>
         <iframe
           class="landing-component__frame"
           data-component-frame="${escapeHTML(component.instance_id)}"
@@ -164,15 +213,15 @@
     return `
       <article class="landing-component ${component.hidden ? "landing-component--hidden" : ""} ${state.selectedInstanceId === component.instance_id ? "landing-component--selected" : ""}"
         data-landing-component="${escapeHTML(component.instance_id)}">
-        <div class="landing-component__label">${escapeHTML(component.name)}</div>
         <div class="landing-component__toolbar" aria-label="${escapeHTML(component.name)} 설정">
+          <button type="button" class="landing-component__drag-handle" data-component-action="drag" title="끌어서 순서 변경">⠿ ${escapeHTML(component.name)}</button>
+          <span class="landing-component__toolbar-separator"></span>
           ${layoutControl}
-          <button type="button" data-component-action="drag" title="드래그해서 이동">⋮⋮</button>
           <button type="button" data-component-action="up" ${index === 0 ? "disabled" : ""} title="위로 이동">↑</button>
           <button type="button" data-component-action="down" ${index === count - 1 ? "disabled" : ""} title="아래로 이동">↓</button>
-          <button type="button" data-component-action="duplicate" title="복제">복제</button>
-          <button type="button" data-component-action="hide" title="숨김">${component.hidden ? "표시" : "숨김"}</button>
-          <button type="button" data-component-action="delete" title="삭제">삭제</button>
+          <button type="button" data-component-action="duplicate" title="복제">⧉</button>
+          <button type="button" data-component-action="hide" title="숨김">${component.hidden ? "보기" : "숨김"}</button>
+          <button type="button" data-component-action="delete" title="삭제">✕</button>
         </div>
         ${component.hidden ? '<div class="landing-component__hidden-message">숨긴 컴포넌트</div>' : `
           <iframe
@@ -196,7 +245,13 @@
   }
 
   function libraryMarkup() {
-    const templates = state.landing?.component_library || [];
+    const query = state.componentQuery.trim().toLowerCase();
+    const templates = (state.landing?.component_library || []).filter((template) => (
+      !query
+      || template.name.toLowerCase().includes(query)
+      || template.category.toLowerCase().includes(query)
+      || template.filename.toLowerCase().includes(query)
+    ));
     if (!templates.length) return '<p class="landing-panel__empty">사용 가능한 컴포넌트가 없습니다.</p>';
     return templates.map((template) => `
       <button type="button" class="landing-library-item" data-add-template="${escapeHTML(template.template_id)}" draggable="true">
@@ -208,10 +263,7 @@
   function inspectorMarkup() {
     if (!state.selectedEditable) {
       return `
-        <div class="landing-inspector__empty">
-          <strong>편집할 요소를 선택하세요</strong>
-          <p>캔버스의 이미지나 텍스트를 더블클릭하면 여기에서 변경할 수 있습니다.</p>
-        </div>`;
+        <div class="landing-inspector__empty landing-inspector__empty--blank"></div>`;
     }
     const isImage = state.selectedEditable.editableType === "image";
     const selectedImageUrl = isImage ? displayAssetUrl(state.selectedEditable.value) : "";
@@ -227,7 +279,7 @@
       </button>`).join("");
     return `
       <div class="landing-inspector__header">
-        <span>${isImage ? "이미지" : "카피"} 편집</span>
+        <span>${isImage ? "KV Image" : "Text"}</span>
         <button type="button" data-close-inspector aria-label="속성 패널 닫기">×</button>
       </div>
       <div class="landing-inspector__body">
@@ -269,6 +321,12 @@
           ${state.candidateError ? `<p class="landing-inspector__error">${escapeHTML(state.candidateError)}</p>` : ""}
           ${copyCandidates ? `<div class="landing-copy-candidates">${copyCandidates}</div>` : ""}
         `}
+        <div class="landing-inspector__actions">
+          <button type="button" class="landing-button landing-button--secondary" data-preview>미리보기</button>
+          <button type="button" class="landing-button landing-button--primary" data-save ${state.saveLoading ? "disabled" : ""}>
+            ${state.saveLoading ? "저장 중..." : "저장"}
+          </button>
+        </div>
       </div>`;
   }
 
@@ -282,7 +340,6 @@
     const headerComponents = page.header_components || [];
     const header = headerComponents.length ? `
       <section class="landing-fixed-header" aria-label="공통 고정 Header">
-        <div class="landing-canvas__section-label"><strong>Header</strong><span>모든 페르소나에 공통 적용</span></div>
         ${headerComponents.map((component) => fixedHeaderCard(component)).join("")}
       </section>` : "";
     const components = [
@@ -301,42 +358,72 @@
       <div class="landing-preview" role="dialog" aria-modal="true" aria-label="랜딩 페이지 미리보기">
         <div class="landing-preview__bar">
           <div><strong>${escapeHTML(page.persona_name)}</strong><span>미리보기</span></div>
+          ${zoomControlsMarkup("preview", state.previewZoom)}
           <button type="button" data-close-preview>편집기로 돌아가기</button>
         </div>
+        <div class="landing-preview__viewport">
+          <div class="landing-preview__stage" style="--landing-zoom: ${state.previewZoom}">
         <iframe title="${escapeHTML(page.persona_name)} 랜딩 페이지 전체 미리보기"
           sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
           srcdoc="${escapeHTML(previewDocument())}"></iframe>
+          </div>
+        </div>
       </div>` : "";
     return `
       <section class="landing-editor" aria-label="랜딩 페이지 편집기">
-        <header class="landing-editor__topbar">
-          <div class="landing-editor__title">
-            <strong>Landing Page Editor</strong>
-            <span>${escapeHTML(page.persona_name)} 맞춤 페이지</span>
-          </div>
-          <div class="landing-editor__history">
-            <button type="button" data-history="undo" title="되돌리기" ${state.history.length ? "" : "disabled"}>↶</button>
-            <button type="button" data-history="redo" title="다시 실행" ${state.future.length ? "" : "disabled"}>↷</button>
-          </div>
-          <div class="landing-editor__actions">
-            ${saveStatus}
-            <button type="button" class="landing-button landing-button--secondary" data-preview>미리보기</button>
-            <button type="button" class="landing-button landing-button--primary" data-save ${state.saveLoading ? "disabled" : ""}>
-              ${state.saveLoading ? "저장 중..." : "저장"}
-            </button>
+        <header class="landing-page-hero">
+          <div class="screen-content">
+            <div class="page-header">
+              ${window.progressMarkup ? window.progressMarkup([1, 1, 1, 1, 1]) : ""}
+              <div class="heading-block">
+                <div class="heading-block__titles">
+                  <p class="brand-name">IKEA</p>
+                  <h1>Landing Page</h1>
+                </div>
+                <p class="heading-block__description">AI가 페르소나별 랜딩페이지를 생성했어요. 직접 다듬어 완성해보세요.</p>
+              </div>
+            </div>
           </div>
         </header>
-        <div class="landing-editor__tabs" role="tablist" aria-label="페르소나별 랜딩 페이지">${tabs}</div>
         <div class="landing-editor__workspace">
           <aside class="landing-panel landing-panel--library">
-            <div class="landing-panel__title"><strong>Body Components</strong><span>${state.landing.component_library.length}</span></div>
+            <div class="landing-panel__title">
+              <strong>Component</strong>
+              <p>끌어서 페이지에 놓으면 추가돼요. 블록을 잡고 옮기면 순서가 바뀝니다.</p>
+            </div>
+            <label class="landing-library-search">
+              <span>검색</span>
+              <input type="search" data-component-search value="${escapeHTML(state.componentQuery)}" placeholder="컴포넌트 검색" />
+            </label>
             <div class="landing-library">${libraryMarkup()}</div>
           </aside>
-          <main class="landing-canvas-wrap">
-            <div class="landing-canvas" data-landing-canvas>
-              ${header}
-              <div class="landing-canvas__section-label landing-canvas__section-label--body"><strong>Body</strong><span>페르소나별 구성 및 편집</span></div>
-              ${components}
+          <main class="landing-center">
+            <div class="landing-center__tools">
+              <div class="landing-editor__tabs" role="tablist" aria-label="페르소나별 랜딩 페이지">${tabs}</div>
+              <div class="landing-editor__actions">
+                <div class="landing-device-toggle" aria-label="디바이스 미리보기">
+                  <button type="button" data-device="desktop" class="${state.device === "desktop" ? "is-active" : ""}">데스크톱</button>
+                  <button type="button" data-device="mobile" class="${state.device === "mobile" ? "is-active" : ""}">모바일</button>
+                </div>
+                ${zoomControlsMarkup("canvas", state.zoom)}
+                ${saveStatus}
+                <button type="button" class="landing-button landing-button--secondary" data-reset-page>기본 구성</button>
+                <button type="button" class="landing-button landing-button--secondary" data-preview>미리보기</button>
+                <button type="button" class="landing-button landing-button--secondary" data-open-preview>새 탭</button>
+                <button type="button" class="landing-button landing-button--secondary" data-download-html>HTML</button>
+              </div>
+            </div>
+            <section class="landing-intent">
+              <span>✦ AI 의도</span>
+              <p>${escapeHTML(page.ai_intent || "AI가 구성 의도를 제공하지 않았습니다.")}</p>
+            </section>
+            <div class="landing-canvas-wrap">
+              <div class="landing-canvas-stage" style="--landing-zoom: ${state.zoom}">
+                <div class="landing-canvas" data-landing-canvas>
+                  ${header}
+                  ${components}
+                </div>
+              </div>
             </div>
           </main>
           <aside class="landing-panel landing-panel--inspector">${inspectorMarkup()}</aside>
@@ -403,6 +490,7 @@
     try {
       state.landing = await window.LandingAPI.create(projectId);
       rememberLanding(state.landing.landing_id);
+      rememberInitialPages();
       state.activePersonaIndex = 0;
       state.history = [];
       state.future = [];
@@ -428,6 +516,7 @@
     try {
       state.landing = await window.LandingAPI.get(landingId);
       state.projectId = state.landing.project_id;
+      rememberInitialPages();
       state.activePersonaIndex = 0;
       const storedDraft = sessionStorage.getItem(`landingDraft:${landingId}`);
       if (storedDraft) {
@@ -489,6 +578,43 @@
     const preview = event.target.closest("[data-preview]");
     const closePreview = event.target.closest("[data-close-preview]");
     const save = event.target.closest("[data-save]");
+    const zoom = event.target.closest("[data-zoom]");
+    const device = event.target.closest("[data-device]");
+    const resetPage = event.target.closest("[data-reset-page]");
+    const openPreview = event.target.closest("[data-open-preview]");
+    const downloadHtml = event.target.closest("[data-download-html]");
+    const backFinalCheck = event.target.closest("[data-back-final-check]");
+    if (backFinalCheck) {
+      window.location.hash = "#final-check";
+      return;
+    }
+    if (device) {
+      state.device = device.dataset.device === "mobile" ? "mobile" : "desktop";
+      state.zoom = state.device === "mobile" ? 0.35 : 0.5;
+      requestRender();
+      return;
+    }
+    if (zoom) {
+      const [target, action] = zoom.dataset.zoom.split(":");
+      const key = target === "preview" ? "previewZoom" : "zoom";
+      if (action === "out") state[key] = clampZoom(state[key] - zoomStep);
+      if (action === "in") state[key] = clampZoom(state[key] + zoomStep);
+      if (action === "reset") state[key] = 1;
+      requestRender();
+      return;
+    }
+    if (resetPage) {
+      resetActivePage();
+      return;
+    }
+    if (openPreview) {
+      openPreviewTab();
+      return;
+    }
+    if (downloadHtml) {
+      downloadCurrentHtml();
+      return;
+    }
     if (personaTab) {
       state.activePersonaIndex = Number(personaTab.dataset.landingPersona);
       state.selectedInstanceId = "";
@@ -709,7 +835,11 @@
     const pattern = /(<([a-z][\w:-]*)\b(?=[^>]*\bdata-editable\s*=\s*['"]copy['"])[^>]*>)([\s\S]*?)(<\/\2\s*>)/gi;
     let index = 0;
     let replaced = false;
-    const escapedValue = escapeHTML(value);
+    const escapedValue = escapeHTML(value)
+      .replace(/\r\n?/g, "\n")
+      .split("\n")
+      .map((line) => line.trim())
+      .join("<br>");
     const html = source.replace(pattern, (match, opening, tag, content, closing) => {
       if (index++ !== typeIndex) return match;
       replaced = true;
@@ -776,7 +906,43 @@
     }
     if (event.target.matches("[data-copy-prompt]")) state.copyPrompt = event.target.value;
     if (event.target.matches("[data-image-prompt]")) state.imagePrompt = event.target.value;
+    if (event.target.matches("[data-component-search]")) {
+      state.componentQuery = event.target.value;
+      requestRender();
+    }
   });
+
+  function resetActivePage() {
+    const page = activePage();
+    const initial = state.initialPages[state.activePersonaIndex];
+    if (!page || !initial) return;
+    commitMutation(() => {
+      state.landing.pages[state.activePersonaIndex] = structuredClone(initial);
+    });
+  }
+
+  function openPreviewTab() {
+    const preview = window.open("", "_blank");
+    if (!preview) {
+      state.saveError = "팝업이 차단됐습니다. 브라우저 설정을 확인해 주세요.";
+      requestRender();
+      return;
+    }
+    preview.document.write(exportDocument());
+    preview.document.close();
+  }
+
+  function downloadCurrentHtml() {
+    const page = activePage();
+    const blob = new Blob([exportDocument(page)], { type: "text/html;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `${page?.persona_key || "landing"}.html`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 5000);
+  }
 
   document.addEventListener("change", async (event) => {
     const layout = event.target.closest("[data-component-layout]");
