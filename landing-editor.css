@@ -248,11 +248,22 @@ body[data-screen="landing-editor"] #app {
   font-weight: 800;
 }
 
-.landing-intent p {
+.landing-intent li {
   margin: 0;
   color: #4e5968;
   font-size: 10px;
   line-height: 1.45;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.landing-intent__content {
+  display: grid;
+  min-width: 0;
+  width: 100%;
+  margin: 0;
+  padding-left: 16px;
+  gap: 2px;
 }
 
 .landing-editor__workspace {

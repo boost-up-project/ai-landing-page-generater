@@ -67,6 +67,20 @@
     return state.landing?.pages?.[state.activePersonaIndex] || null;
   }
 
+  function personaUXIntentItems(page) {
+    const strategy = page?.ux_strategy || {};
+    const items = (strategy.component_strategy || [])
+      .map((reason) => String(reason).trim())
+      .filter(Boolean);
+    return items.length
+      ? items
+      : ["고객의 탐색 흐름에 맞춰 정보, 상품 제안, CTA를 배치합니다."];
+  }
+
+  function commentText(value = "") {
+    return String(value).replaceAll(/\s+/g, " ").replaceAll("--", "-").trim();
+  }
+
   function requestRender() {
     window.dispatchEvent(new CustomEvent("landing-editor-change"));
   }
@@ -231,6 +245,9 @@
     ]
       .map((component) => replaceAssetUrls(component.html))
       .join("\n");
+    const uxIntentComment = personaUXIntentItems(page)
+      .map((intent) => `- ${escapeHTML(commentText(intent))}`)
+      .join("\n");
     return `<!doctype html>
 <html lang="ko">
 <head>
@@ -238,7 +255,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHTML(page?.persona_name || "Landing Page")}</title>
 ${componentSpacingOverrides}
-<!-- AI 의도: ${escapeHTML(page?.ai_intent || "").replaceAll("--", "-")} -->
+<!-- UX 배치 의도
+${uxIntentComment} -->
 </head>
 <body>${content}</body>
 </html>`;
@@ -499,8 +517,10 @@ ${componentSpacingOverrides}
               <div class="landing-editor__tabs" role="tablist" aria-label="페르소나별 랜딩 페이지">${tabs}</div>
             </div>
             <section class="landing-intent">
-              <span>✦ AI 의도</span>
-              <p>${escapeHTML(page.ai_intent || "AI가 구성 의도를 제공하지 않았습니다.")}</p>
+              <span>✦ UX 배치 의도</span>
+              <ul class="landing-intent__content">
+                ${personaUXIntentItems(page).map((intent) => `<li>${escapeHTML(intent)}</li>`).join("")}
+              </ul>
             </section>
             <div class="landing-canvas-wrap">
               <div class="landing-canvas-stage" style="--landing-zoom: ${state.zoom}">
