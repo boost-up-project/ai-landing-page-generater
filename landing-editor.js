@@ -26,8 +26,8 @@
     saveNotice: "",
     previewOpen: false,
     restoreAttempted: false,
-    zoom: 0.5,
-    previewZoom: 0.5,
+    zoom: 0.8,
+    previewZoom: 0.7,
     componentQuery: "",
     device: "desktop",
     initialPages: [],
@@ -36,6 +36,12 @@
   const zoomMin = 0.5;
   const zoomMax = 1.5;
   const zoomStep = 0.1;
+  const componentSpacingOverrides = `<style>
+    [data-component-category]:not(header) {
+      width: auto !important;
+      margin-inline: 46px !important;
+    }
+  </style>`;
 
   function escapeHTML(value = "") {
     return String(value)
@@ -148,8 +154,10 @@
             editableIndex: editableNodes().indexOf(target),
             editableTypeIndex: editableNodes().filter((item) => item.dataset.editable === target.dataset.editable).indexOf(target),
             editableType: target.dataset.editable,
-            value: target.dataset.editable === "image" ? target.getAttribute("src") || "" : target.innerText || "",
-            alt: target.getAttribute("alt") || "",
+            value: target.dataset.editable === "image"
+              ? target.getAttribute("src") || target.dataset.editableImageSrc || ""
+              : target.innerText || "",
+            alt: target.getAttribute("alt") || target.getAttribute("aria-label") || "",
             width: Math.round(target.getBoundingClientRect().width),
             height: Math.round(target.getBoundingClientRect().height)
           }, "*");
@@ -158,7 +166,7 @@
         window.addEventListener("load", sendHeight);
         setTimeout(sendHeight, 100);
       <\/script>`;
-    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>${replaceAssetUrls(component.html)}${bridge}</body></html>`;
+    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${componentSpacingOverrides}</head><body>${replaceAssetUrls(component.html)}${bridge}</body></html>`;
   }
 
   function previewDocument() {
@@ -169,7 +177,7 @@
     ]
       .map((component) => replaceAssetUrls(component.html))
       .join("\n");
-    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>${content}</body></html>`;
+    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${componentSpacingOverrides}</head><body>${content}</body></html>`;
   }
 
   function exportDocument(page = activePage()) {
@@ -185,6 +193,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHTML(page?.persona_name || "Landing Page")}</title>
+${componentSpacingOverrides}
 <!-- AI 의도: ${escapeHTML(page?.ai_intent || "").replaceAll("--", "-")} -->
 </head>
 <body>${content}</body>
@@ -256,7 +265,7 @@
       root?.className,
       root?.id,
     ].join(" ").toLowerCase();
-    const imageCount = root?.querySelectorAll("img, picture, video").length || 0;
+    const imageCount = root?.querySelectorAll('[data-editable="image"]').length || 0;
     const cardCount = root?.querySelectorAll("article, li").length || 0;
     const hasCTA = Boolean(root?.querySelector("a, button"));
     let type = "content";
@@ -654,7 +663,7 @@
     }
     if (device) {
       state.device = device.dataset.device === "mobile" ? "mobile" : "desktop";
-      state.zoom = state.device === "mobile" ? 0.35 : 0.5;
+      state.zoom = state.device === "mobile" ? 0.5 : 0.8;
       requestRender();
       return;
     }
@@ -811,14 +820,32 @@
     ));
   }
 
+  function setBackgroundImageOnTag(tag, src) {
+    const styleMatch = tag.match(/\bstyle\s*=\s*(["'])([\s\S]*?)\1/i);
+    const declarations = (styleMatch?.[2] || "")
+      .split(";")
+      .map((item) => item.trim())
+      .filter((item) => item && !/^(background-image|background-size|background-position)\s*:/i.test(item));
+    const safeSrc = String(src).replaceAll("\\", "\\\\").replaceAll("'", "\\'");
+    declarations.push(`background-image:url('${safeSrc}')`, "background-size:cover", "background-position:center");
+    return setTagAttribute(
+      setTagAttribute(tag, "data-editable-image-src", src),
+      "style",
+      declarations.join(";"),
+    );
+  }
+
   function replaceImageAt(source, typeIndex, src, alt) {
-    const pattern = /<img\b(?=[^>]*\bdata-editable\s*=\s*['"]image['"])[^>]*>/gi;
+    const pattern = /<(img|div|figure)\b(?=[^>]*\bdata-editable\s*=\s*['"]image['"])[^>]*>/gi;
     let index = 0;
     let replaced = false;
-    const html = source.replace(pattern, (tag) => {
+    const html = source.replace(pattern, (tag, tagName) => {
       if (index++ !== typeIndex) return tag;
       replaced = true;
-      return setTagAttribute(setTagAttribute(tag, "src", src), "alt", alt);
+      if (tagName.toLowerCase() === "img") {
+        return setTagAttribute(setTagAttribute(tag, "src", src), "alt", alt);
+      }
+      return setTagAttribute(setBackgroundImageOnTag(tag, src), "aria-label", alt);
     });
     return replaced ? html : null;
   }
