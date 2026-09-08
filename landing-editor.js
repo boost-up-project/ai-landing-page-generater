@@ -475,9 +475,9 @@ ${componentSpacingOverrides}
               <div class="heading-block">
                 <div class="heading-block__titles">
                   <p class="brand-name">IKEA</p>
-                  <h1>Landing Page</h1>
+                  <h1>Campaign Page Workspace</h1>
                 </div>
-                <p class="heading-block__description">AI가 페르소나별 랜딩페이지를 생성했어요. 직접 다듬어 완성해보세요.</p>
+                <p class="heading-block__description">캠페인 페이지가 생성되었어요. 자유롭게 수정할 수 있어요. </p>
               </div>
             </div>
           </div>
