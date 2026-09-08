@@ -568,6 +568,11 @@ body[data-screen="landing-editor"] #app {
   background: #fff;
 }
 
+.landing-canvas [data-component-category]:not(header) {
+  width: auto !important;
+  margin-inline: 46px !important;
+}
+
 .landing-component {
   position: relative;
   min-height: 48px;
@@ -1185,7 +1190,7 @@ body[data-screen="landing-editor"] #app {
 .landing-preview__stage {
   position: relative;
   width: calc(1440px * var(--landing-zoom));
-  height: calc((100vh - 160px) * var(--landing-zoom));
+  height: calc(100vh - 108px);
   margin: 0 auto;
 }
 
@@ -1195,8 +1200,8 @@ body[data-screen="landing-editor"] #app {
   left: 50%;
   display: block;
   width: 1440px;
-  height: calc(100vh - 160px);
-  transform: translateX(-50%) scale(var(--landing-zoom));
+  height: calc(100vh - 108px);
+  transform: translateX(-50%) scaleX(var(--landing-zoom)) scaleY(1);
   transform-origin: top center;
   margin: 0 auto;
   border: 0;

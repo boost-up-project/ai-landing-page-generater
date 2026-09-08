@@ -1372,6 +1372,16 @@ body[data-screen="final-check"] .page-direction--next {
   gap: 4px;
 }
 
+.brand-review-section,
+.campaign-review-section {
+  gap: 14px !important;
+}
+
+.brand-review-area,
+.campaign-review-area {
+  gap: 40px;
+}
+
 .section-files,
 .inline-chips {
   display: flex;
@@ -1421,6 +1431,73 @@ body[data-screen="final-check"] .page-direction--next {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.review-item__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.review-item__body[hidden] {
+  display: none;
+}
+
+.review-item--collapsible {
+  overflow: hidden;
+  gap: 0;
+  border: 1px solid #e5e8eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.review-item--collapsible .review-item__header {
+  min-height: 52px;
+  padding: 0 14px;
+  align-items: center;
+  background: #fff;
+}
+
+.review-item--collapsible .review-item__header:hover {
+  background: var(--surface);
+}
+
+.review-item--collapsible .review-item__body {
+  padding: 14px 16px 18px;
+  gap: 8px;
+  border-top: 1px solid #e5e8eb;
+}
+
+.review-item__toggle {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  color: var(--text);
+  text-align: left;
+}
+
+.review-item__toggle span {
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.review-item__toggle .review-item__triangle {
+  width: 0;
+  height: 0;
+  flex: 0 0 auto;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 7px solid #59636e;
+  transform-origin: 3px 5px;
+  transition: transform 160ms ease;
+}
+
+.review-item--open .review-item__toggle .review-item__triangle {
+  transform: rotate(90deg);
 }
 
 .review-item__header {
@@ -1485,6 +1562,14 @@ body[data-screen="final-check"] .page-direction--next {
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.3;
+}
+
+.brand-review-section .review-textarea,
+.campaign-review-section .review-textarea {
+  min-height: 160px;
+  padding: 16px;
+  line-height: 1.65;
+  white-space: pre-wrap;
 }
 
 .review-textarea--focused,

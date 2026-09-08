@@ -199,6 +199,9 @@ const campaignState = {
   notice: "",
   referenceUrl: "",
 };
+const campaignReviewState = {
+  openItems: new Set(["campaign_overview"]),
+};
 const personaState = {
   inputs: [""],
   analysis: null,
@@ -211,6 +214,9 @@ const personaState = {
 const finalCheckState = {
   openSection: "",
   openPersonaIndex: 0,
+};
+const brandReviewState = {
+  openItems: new Set(["brand_identity.brand_overview"]),
 };
 const flowState = {
   projectId: sessionStorage.getItem("projectId") || "",
@@ -587,6 +593,22 @@ function reviewColorPalette(content) {
     </div>`;
 }
 
+function reviewBulletText(content) {
+  const items = String(content || "")
+    .split(/\r?\n|\s+\/\s+/)
+    .map((item) => item.replace(/^\s*[•*-]\s*/, "").trim())
+    .filter(Boolean);
+  return items.map((item) => `• ${item}`).join("\n");
+}
+
+function resizeReviewTextareas(root = document) {
+  root.querySelectorAll(".review-textarea").forEach((textarea) => {
+    if (textarea.offsetParent === null) return;
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.max(132, textarea.scrollHeight + 2)}px`;
+  });
+}
+
 function previewUrlFor(file) {
   if (!assetPreviewUrls.has(file)) {
     assetPreviewUrls.set(file, URL.createObjectURL(file));
@@ -618,6 +640,9 @@ function reviewItem(index, options = {}) {
     path = "",
     assetGroup = "",
     pathAttribute = "data-brand-path",
+    collapsible = false,
+    isOpen = true,
+    toggleAttribute = "data-brand-review-item-toggle",
   } = options;
   const directAssets = assetGroup ? brandState.files[assetGroup] : [];
   const chips = references.length
@@ -627,20 +652,35 @@ function reviewItem(index, options = {}) {
   const colorPalette = path === "visual_guideline.color"
     ? reviewColorPalette(content)
     : "";
-  return `
-    <div class="review-item">
-      <div class="review-item__header">
+  const itemId = collapsible ? `review-item-${path.replace(/[^a-z0-9_-]/gi, "-")}` : "";
+  const titleMarkup = collapsible
+    ? `<button
+        type="button"
+        class="review-item__toggle"
+        ${toggleAttribute}="${path}"
+        aria-expanded="${isOpen}"
+        aria-controls="${itemId}"
+      >
+        <span class="review-item__triangle" aria-hidden="true"></span>
         <span>${index}. ${escapeHTML(title)}</span>
+      </button>`
+    : `<span>${index}. ${escapeHTML(title)}</span>`;
+  return `
+    <div class="review-item ${collapsible ? "review-item--collapsible" : ""} ${isOpen ? "review-item--open" : ""}">
+      <div class="review-item__header">
+        ${titleMarkup}
         <span class="review-item__actions">
           <button class="refresh-button" type="button" data-refresh><img src="assets/refresh.svg" alt="" /><span>원문 복원</span></button>
         </span>
       </div>
-      ${chips}
-      ${assetPreview}
-      ${colorPalette}
-      <div class="textarea-wrap">
-        <textarea class="review-textarea" ${pathAttribute}="${path}" data-original-value="${escapeHTML(content)}">${escapeHTML(content)}</textarea>
-        <img class="textarea-grip" src="assets/grip.svg" alt="" />
+      <div class="review-item__body" ${itemId ? `id="${itemId}"` : ""} ${collapsible && !isOpen ? "hidden" : ""}>
+        ${chips}
+        ${assetPreview}
+        ${colorPalette}
+        <div class="textarea-wrap">
+          <textarea class="review-textarea" ${pathAttribute}="${path}" data-original-value="${escapeHTML(content)}">${escapeHTML(content)}</textarea>
+          <img class="textarea-grip" src="assets/grip.svg" alt="" />
+        </div>
       </div>
     </div>`;
 }
@@ -652,19 +692,22 @@ function actualBrandReviewMarkup() {
   return Object.entries(brandReviewFields).map(([groupKey, group]) => {
     const items = group.fields.map(([fieldKey, label], index) => {
       const section = brandState.analysis.data[groupKey][fieldKey];
+      const path = `${groupKey}.${fieldKey}`;
       return reviewItem(index + 1, {
         title: label,
-        content: section.content,
+        content: reviewBulletText(section.content),
         references: section.source_references,
-        path: `${groupKey}.${fieldKey}`,
+        path,
         assetGroup: groupKey === "visual_guideline" && ["logo", "icon"].includes(fieldKey)
           ? fieldKey
           : "",
+        collapsible: true,
+        isOpen: brandReviewState.openItems.has(path),
       });
     }).join("");
     return `
-      <section class="review-section">
-        <div class="review-section__title"><h2>${group.title}</h2></div>
+      <section class="review-section brand-review-section">
+        <div class="review-section__title"><h2>${escapeHTML(group.title)}</h2></div>
         <div class="review-section__items">${items}</div>
       </section>`;
   }).join("");
@@ -683,14 +726,17 @@ function actualCampaignReviewMarkup() {
     const section = campaignState.analysis.data[fieldKey];
     return reviewItem(index + 1, {
       title: label,
-      content: section.content,
+      content: reviewBulletText(section.content),
       references: section.source_references,
       path: fieldKey,
       pathAttribute: "data-campaign-path",
+      collapsible: true,
+      isOpen: campaignReviewState.openItems.has(fieldKey),
+      toggleAttribute: "data-campaign-review-item-toggle",
     });
   }).join("");
   return `
-    <section class="review-section">
+    <section class="review-section campaign-review-section">
       <div class="review-section__title"><h2>Campaign Strategy</h2></div>
       <div class="review-section__items">${items}</div>
     </section>`;
@@ -710,7 +756,7 @@ function checkMarkup(type) {
     <div class="screen-content screen-content--review">
       ${headerMarkup(title, description, progress)}
       ${feedbackMarkup()}
-      <div class="review-area">${sections}</div>
+      <div class="review-area ${isBrand ? "brand-review-area" : "campaign-review-area"}">${sections}</div>
     </div>`;
 }
 
@@ -997,6 +1043,18 @@ function finalCheckMarkup() {
 function render() {
   window.clearTimeout(loadingTimer);
   const screen = screens[currentIndex];
+  const preserveLandingScroll = (
+    screen === "landing-editor"
+    && document.body.dataset.screen === "landing-editor"
+  );
+  const landingScroll = preserveLandingScroll ? {
+    windowX: window.scrollX,
+    windowY: window.scrollY,
+    canvasTop: app.querySelector(".landing-canvas-wrap")?.scrollTop || 0,
+    canvasLeft: app.querySelector(".landing-canvas-wrap")?.scrollLeft || 0,
+    libraryTop: app.querySelector(".landing-panel--library")?.scrollTop || 0,
+    inspectorTop: app.querySelector(".landing-panel--inspector")?.scrollTop || 0,
+  } : null;
   document.body.dataset.screen = screen;
   const renderScreen = {
     "brand-start": brandStartMarkup,
@@ -1017,7 +1075,28 @@ function render() {
 
   app.innerHTML = renderScreen();
   if (screen === "landing-editor") window.LandingEditor.mount(app);
-  window.scrollTo(0, 0);
+  if (screen === "brand-check" || screen === "campaign-check") resizeReviewTextareas(app);
+  if (landingScroll) {
+    const restoreLandingScroll = () => {
+      window.scrollTo(landingScroll.windowX, landingScroll.windowY);
+      const canvas = app.querySelector(".landing-canvas-wrap");
+      if (canvas) {
+        canvas.scrollTop = landingScroll.canvasTop;
+        canvas.scrollLeft = landingScroll.canvasLeft;
+      }
+      const library = app.querySelector(".landing-panel--library");
+      if (library) library.scrollTop = landingScroll.libraryTop;
+      const inspector = app.querySelector(".landing-panel--inspector");
+      if (inspector) inspector.scrollTop = landingScroll.inspectorTop;
+    };
+    restoreLandingScroll();
+    window.requestAnimationFrame(() => {
+      restoreLandingScroll();
+      window.requestAnimationFrame(restoreLandingScroll);
+    });
+  } else {
+    window.scrollTo(0, 0);
+  }
   updateNavigation(screen);
   if (screen === "persona-loading" && personaState.loadingPhase < personaState.inputs.length - 1) {
     loadingTimer = window.setTimeout(() => {
@@ -1375,6 +1454,8 @@ app.addEventListener("click", async (event) => {
   const addPersona = event.target.closest("[data-add-persona]");
   const removePersona = event.target.closest("[data-remove-persona]");
   const personaTab = event.target.closest("[data-persona-tab]");
+  const brandReviewItemToggle = event.target.closest("[data-brand-review-item-toggle]");
+  const campaignReviewItemToggle = event.target.closest("[data-campaign-review-item-toggle]");
   const finalToggle = event.target.closest("[data-final-toggle]");
   const finalPersonaToggle = event.target.closest("[data-final-persona-toggle]");
   const finalEdit = event.target.closest("[data-final-edit]");
@@ -1387,6 +1468,34 @@ app.addEventListener("click", async (event) => {
     } else {
       routeTo(screens.indexOf("brand-input"));
     }
+    return;
+  }
+
+  if (brandReviewItemToggle) {
+    const path = brandReviewItemToggle.dataset.brandReviewItemToggle;
+    const item = brandReviewItemToggle.closest(".review-item--collapsible");
+    const body = item?.querySelector(".review-item__body");
+    const isOpen = !brandReviewState.openItems.has(path);
+    if (isOpen) brandReviewState.openItems.add(path);
+    else brandReviewState.openItems.delete(path);
+    item?.classList.toggle("review-item--open", isOpen);
+    brandReviewItemToggle.setAttribute("aria-expanded", String(isOpen));
+    if (body) body.hidden = !isOpen;
+    if (isOpen && body) window.requestAnimationFrame(() => resizeReviewTextareas(body));
+    return;
+  }
+
+  if (campaignReviewItemToggle) {
+    const path = campaignReviewItemToggle.dataset.campaignReviewItemToggle;
+    const item = campaignReviewItemToggle.closest(".review-item--collapsible");
+    const body = item?.querySelector(".review-item__body");
+    const isOpen = !campaignReviewState.openItems.has(path);
+    if (isOpen) campaignReviewState.openItems.add(path);
+    else campaignReviewState.openItems.delete(path);
+    item?.classList.toggle("review-item--open", isOpen);
+    campaignReviewItemToggle.setAttribute("aria-expanded", String(isOpen));
+    if (body) body.hidden = !isOpen;
+    if (isOpen && body) window.requestAnimationFrame(() => resizeReviewTextareas(body));
     return;
   }
 
@@ -1572,8 +1681,20 @@ app.addEventListener("input", (event) => {
     sessionStorage.setItem("brandName", brandState.name);
     brandState.error = "";
   }
-  if (event.target.matches("[data-brand-path]")) brandState.error = "";
-  if (event.target.matches("[data-campaign-path]")) campaignState.error = "";
+  if (event.target.matches("[data-brand-path]")) {
+    const [groupKey, fieldKey] = event.target.dataset.brandPath.split(".");
+    if (brandState.analysis?.data?.[groupKey]?.[fieldKey]) {
+      brandState.analysis.data[groupKey][fieldKey].content = event.target.value;
+    }
+    brandState.error = "";
+  }
+  if (event.target.matches("[data-campaign-path]")) {
+    const fieldKey = event.target.dataset.campaignPath;
+    if (campaignState.analysis?.data?.[fieldKey]) {
+      campaignState.analysis.data[fieldKey].content = event.target.value;
+    }
+    campaignState.error = "";
+  }
   if (event.target.matches("[data-campaign-reference-url]")) {
     campaignState.referenceUrl = event.target.value;
     campaignState.error = "";
