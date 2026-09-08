@@ -154,8 +154,10 @@
             editableIndex: editableNodes().indexOf(target),
             editableTypeIndex: editableNodes().filter((item) => item.dataset.editable === target.dataset.editable).indexOf(target),
             editableType: target.dataset.editable,
-            value: target.dataset.editable === "image" ? target.getAttribute("src") || "" : target.innerText || "",
-            alt: target.getAttribute("alt") || "",
+            value: target.dataset.editable === "image"
+              ? target.getAttribute("src") || target.dataset.editableImageSrc || ""
+              : target.innerText || "",
+            alt: target.getAttribute("alt") || target.getAttribute("aria-label") || "",
             width: Math.round(target.getBoundingClientRect().width),
             height: Math.round(target.getBoundingClientRect().height)
           }, "*");
@@ -263,7 +265,7 @@ ${componentSpacingOverrides}
       root?.className,
       root?.id,
     ].join(" ").toLowerCase();
-    const imageCount = root?.querySelectorAll("img, picture, video").length || 0;
+    const imageCount = root?.querySelectorAll('[data-editable="image"]').length || 0;
     const cardCount = root?.querySelectorAll("article, li").length || 0;
     const hasCTA = Boolean(root?.querySelector("a, button"));
     let type = "content";
@@ -818,14 +820,32 @@ ${componentSpacingOverrides}
     ));
   }
 
+  function setBackgroundImageOnTag(tag, src) {
+    const styleMatch = tag.match(/\bstyle\s*=\s*(["'])([\s\S]*?)\1/i);
+    const declarations = (styleMatch?.[2] || "")
+      .split(";")
+      .map((item) => item.trim())
+      .filter((item) => item && !/^(background-image|background-size|background-position)\s*:/i.test(item));
+    const safeSrc = String(src).replaceAll("\\", "\\\\").replaceAll("'", "\\'");
+    declarations.push(`background-image:url('${safeSrc}')`, "background-size:cover", "background-position:center");
+    return setTagAttribute(
+      setTagAttribute(tag, "data-editable-image-src", src),
+      "style",
+      declarations.join(";"),
+    );
+  }
+
   function replaceImageAt(source, typeIndex, src, alt) {
-    const pattern = /<img\b(?=[^>]*\bdata-editable\s*=\s*['"]image['"])[^>]*>/gi;
+    const pattern = /<(img|div|figure)\b(?=[^>]*\bdata-editable\s*=\s*['"]image['"])[^>]*>/gi;
     let index = 0;
     let replaced = false;
-    const html = source.replace(pattern, (tag) => {
+    const html = source.replace(pattern, (tag, tagName) => {
       if (index++ !== typeIndex) return tag;
       replaced = true;
-      return setTagAttribute(setTagAttribute(tag, "src", src), "alt", alt);
+      if (tagName.toLowerCase() === "img") {
+        return setTagAttribute(setTagAttribute(tag, "src", src), "alt", alt);
+      }
+      return setTagAttribute(setBackgroundImageOnTag(tag, src), "aria-label", alt);
     });
     return replaced ? html : null;
   }
