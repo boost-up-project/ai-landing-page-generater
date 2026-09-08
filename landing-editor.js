@@ -459,10 +459,11 @@ ${componentSpacingOverrides}
                 </div>
                 ${zoomControlsMarkup("canvas", state.zoom)}
                 ${saveStatus}
+                <button type="button" class="landing-button landing-button--example" data-example-landing>완성 예시 보기</button>
                 <button type="button" class="landing-button landing-button--secondary" data-reset-page>기본 구성</button>
                 <button type="button" class="landing-button landing-button--secondary" data-preview>미리보기</button>
-                <button type="button" class="landing-button landing-button--secondary" data-open-preview>새 탭</button>
-                <button type="button" class="landing-button landing-button--secondary" data-download-html>HTML</button>
+                <button type="button" class="landing-button landing-button--secondary" data-open-preview>현재 페이지 웹으로 보기 ↗</button>
+                <button type="button" class="landing-button landing-button--secondary" data-download-html>HTML 다운로드</button>
               </div>
             </div>
             <section class="landing-intent">
@@ -654,6 +655,7 @@ ${componentSpacingOverrides}
     const zoom = event.target.closest("[data-zoom]");
     const device = event.target.closest("[data-device]");
     const resetPage = event.target.closest("[data-reset-page]");
+    const exampleLanding = event.target.closest("[data-example-landing]");
     const openPreview = event.target.closest("[data-open-preview]");
     const downloadHtml = event.target.closest("[data-download-html]");
     const backFinalCheck = event.target.closest("[data-back-final-check]");
@@ -678,6 +680,15 @@ ${componentSpacingOverrides}
     }
     if (resetPage) {
       resetActivePage();
+      return;
+    }
+    if (exampleLanding) {
+      const exampleUrl = new URL("examples/ikea-landing-demo.html", document.baseURI).href;
+      const exampleWindow = window.open(exampleUrl, "_blank", "noopener");
+      if (!exampleWindow) {
+        state.saveError = "팝업이 차단됐습니다. 브라우저 설정을 확인해 주세요.";
+        requestRender();
+      }
       return;
     }
     if (openPreview) {

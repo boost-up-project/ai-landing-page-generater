@@ -194,6 +194,16 @@ body[data-screen="landing-editor"] #app {
   color: #fff;
 }
 
+.landing-button--example {
+  border-color: #0058a3;
+  background: #0058a3;
+  color: #fff;
+}
+
+.landing-button--example:hover {
+  background: #004f93;
+}
+
 .landing-editor__tabs {
   display: flex;
   min-width: 0;
@@ -524,16 +534,29 @@ body[data-screen="landing-editor"] #app {
 }
 
 .landing-center__tools {
-  display: flex;
+  display: grid;
   width: min(100%, var(--content-width));
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 10px;
   margin: 0 auto;
 }
 
 .landing-center__tools .landing-editor__actions {
-  display: none;
+  display: flex;
+  width: 100%;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.landing-center__tools .landing-editor__tabs {
+  width: 100%;
+}
+
+.landing-center__tools .landing-button--example,
+.landing-center__tools [data-open-preview] {
+  min-height: 32px;
+  padding-right: 14px;
+  padding-left: 14px;
+  font-size: 12px;
 }
 
 .landing-canvas-wrap {
