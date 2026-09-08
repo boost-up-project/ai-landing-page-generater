@@ -248,11 +248,22 @@ body[data-screen="landing-editor"] #app {
   font-weight: 800;
 }
 
-.landing-intent p {
+.landing-intent li {
   margin: 0;
   color: #4e5968;
   font-size: 10px;
   line-height: 1.45;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.landing-intent__content {
+  display: grid;
+  min-width: 0;
+  width: 100%;
+  margin: 0;
+  padding-left: 16px;
+  gap: 2px;
 }
 
 .landing-editor__workspace {
@@ -527,13 +538,59 @@ body[data-screen="landing-editor"] #app {
   display: flex;
   width: min(100%, var(--content-width));
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
   margin: 0 auto;
 }
 
-.landing-center__tools .landing-editor__actions {
-  display: none;
+.landing-center__tools .landing-editor__tabs {
+  width: 100%;
+}
+
+.landing-export-actions {
+  position: fixed;
+  z-index: 60;
+  right: 20px;
+  bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.landing-export-action {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border: 1px solid #d1d9e0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #4e5968;
+  box-shadow: 0 4px 16px rgba(31, 35, 40, 0.08);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.landing-export-action:hover {
+  border-color: #0088ff;
+  color: #0088ff;
+}
+
+.landing-export-action--primary {
+  border-color: #0088ff;
+  background: #0088ff;
+  color: #fff;
+}
+
+.landing-export-action--primary:hover {
+  border-color: #0077e6;
+  background: #0077e6;
+  color: #fff;
+}
+
+.landing-export-action__icon {
+  font-size: 16px;
+  font-weight: 800;
 }
 
 .landing-canvas-wrap {
@@ -996,6 +1053,15 @@ body[data-screen="landing-editor"] #app {
   width: 100%;
   height: 380px;
   object-fit: cover;
+}
+
+.landing-current-image__empty {
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+  color: #818b98;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .landing-inspector__actions {

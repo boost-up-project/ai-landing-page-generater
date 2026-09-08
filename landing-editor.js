@@ -37,9 +37,20 @@
   const zoomMax = 1.5;
   const zoomStep = 0.1;
   const componentSpacingOverrides = `<style>
+    [data-editable="copy"] {
+      word-break: keep-all !important;
+      overflow-wrap: break-word !important;
+    }
+    h1[data-editable="copy"], h2[data-editable="copy"], h3[data-editable="copy"],
+    h4[data-editable="copy"], h5[data-editable="copy"], h6[data-editable="copy"] {
+      text-wrap: balance;
+    }
     [data-component-category]:not(header) {
       width: auto !important;
       margin-inline: 46px !important;
+    }
+    body > [data-component-category]:not(header) ~ [data-component-category]:not(header) {
+      margin-top: 64px !important;
     }
   </style>`;
 
@@ -54,6 +65,20 @@
 
   function activePage() {
     return state.landing?.pages?.[state.activePersonaIndex] || null;
+  }
+
+  function personaUXIntentItems(page) {
+    const strategy = page?.ux_strategy || {};
+    const items = (strategy.component_strategy || [])
+      .map((reason) => String(reason).trim())
+      .filter(Boolean);
+    return items.length
+      ? items
+      : ["고객의 탐색 흐름에 맞춰 정보, 상품 제안, CTA를 배치합니다."];
+  }
+
+  function commentText(value = "") {
+    return String(value).replaceAll(/\s+/g, " ").replaceAll("--", "-").trim();
   }
 
   function requestRender() {
@@ -135,8 +160,41 @@
     ));
   }
 
+  function editableImageTargets(source = "") {
+    const parsed = new DOMParser().parseFromString(source, "text/html");
+    return Array.from(parsed.querySelectorAll('[data-editable="image"]')).map((target) => {
+      const background = target.style.backgroundImage.match(/^url\((['"]?)(.*?)\1\)$/i)?.[2] || "";
+      return {
+        value: target.getAttribute("src")
+          || target.dataset.editableImageSrc
+          || background,
+        alt: target.getAttribute("alt") || target.getAttribute("aria-label") || "",
+      };
+    });
+  }
+
+  function availableImageValues() {
+    const values = [];
+    const add = (value) => {
+      if (value && !values.includes(value)) values.push(value);
+    };
+    (state.landing?.assets || []).forEach((asset) => add(`asset://${asset.filename}`));
+    const active = activePage();
+    const pages = [active, ...(state.landing?.pages || []).filter((page) => page !== active)];
+    pages.forEach((page) => {
+      [...(page?.header_components || []), ...(page?.components || [])].forEach((component) => {
+        editableImageTargets(component.html).forEach((target) => add(target.value));
+      });
+    });
+    return values;
+  }
+
   function frameDocument(component) {
     const bridge = `
+      <style data-landing-editor-image-cues>
+        [data-editable="image"]{cursor:pointer!important}
+        [data-editable="image"]:hover{outline:3px solid #0088ff!important;outline-offset:-3px}
+      </style>
       <script>
         const sendHeight = () => parent.postMessage({
           type: "landing-frame-height",
@@ -187,6 +245,9 @@
     ]
       .map((component) => replaceAssetUrls(component.html))
       .join("\n");
+    const uxIntentComment = personaUXIntentItems(page)
+      .map((intent) => `- ${escapeHTML(commentText(intent))}`)
+      .join("\n");
     return `<!doctype html>
 <html lang="ko">
 <head>
@@ -194,7 +255,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHTML(page?.persona_name || "Landing Page")}</title>
 ${componentSpacingOverrides}
-<!-- AI 의도: ${escapeHTML(page?.ai_intent || "").replaceAll("--", "-")} -->
+<!-- UX 배치 의도
+${uxIntentComment} -->
 </head>
 <body>${content}</body>
 </html>`;
@@ -215,6 +277,8 @@ ${componentSpacingOverrides}
 
   function componentCard(component, index, count) {
     const layoutOptions = component.layout_options?.length ? component.layout_options : ["source"];
+    const imageControl = editableImageTargets(component.html).length ? `
+      <button type="button" data-component-action="edit-image" title="사진 추가 또는 변경">사진 편집</button>` : "";
     const layoutControl = layoutOptions.length > 1 ? `
       <label class="landing-component__layout">배치
         <select data-component-layout aria-label="${escapeHTML(component.name)} 배치">
@@ -228,6 +292,7 @@ ${componentSpacingOverrides}
           <button type="button" class="landing-component__drag-handle" data-component-action="drag" title="끌어서 순서 변경">⠿ ${escapeHTML(component.name)}</button>
           <span class="landing-component__toolbar-separator"></span>
           ${layoutControl}
+          ${imageControl}
           <button type="button" data-component-action="up" ${index === 0 ? "disabled" : ""} title="위로 이동">↑</button>
           <button type="button" data-component-action="down" ${index === count - 1 ? "disabled" : ""} title="아래로 이동">↓</button>
           <button type="button" data-component-action="duplicate" title="복제">⧉</button>
@@ -319,10 +384,10 @@ ${componentSpacingOverrides}
     }
     const isImage = state.selectedEditable.editableType === "image";
     const selectedImageUrl = isImage ? displayAssetUrl(state.selectedEditable.value) : "";
-    const assetItems = (state.landing?.assets || []).map((asset) => `
-      <button type="button" class="landing-asset-item" data-select-asset="${escapeHTML(asset.filename)}" title="${escapeHTML(asset.filename)}">
-        <img src="${escapeHTML(window.LandingAPI.assetUrl(state.landing.landing_id, asset.filename))}" alt="" />
-        <span>${escapeHTML(asset.filename)}</span>
+    const assetItems = availableImageValues().slice(0, 30).map((value, index) => `
+      <button type="button" class="landing-asset-item" data-select-image="${escapeHTML(value)}" title="이미지 ${index + 1}">
+        <img src="${escapeHTML(displayAssetUrl(value))}" alt="" />
+        <span>이미지 ${index + 1}</span>
       </button>`).join("");
     const copyCandidates = state.copyCandidates.map((candidate, index) => `
       <button type="button" class="landing-copy-candidate" data-copy-candidate="${index}">
@@ -337,15 +402,17 @@ ${componentSpacingOverrides}
       <div class="landing-inspector__body">
         ${isImage ? `
           <div class="landing-current-image">
-            <img src="${escapeHTML(selectedImageUrl)}" alt="${escapeHTML(state.selectedEditable.alt)}" />
+            ${selectedImageUrl
+              ? `<img src="${escapeHTML(selectedImageUrl)}" alt="${escapeHTML(state.selectedEditable.alt)}" />`
+              : '<div class="landing-current-image__empty">아직 이미지가 없습니다.</div>'}
           </div>
           <label>대체 텍스트
             <textarea data-editable-draft>${escapeHTML(state.selectedEditable.alt)}</textarea>
           </label>
           <button type="button" class="landing-button landing-button--secondary" data-apply-image-alt>대체 텍스트 적용</button>
           <div class="landing-inspector__divider"></div>
-          <div class="landing-inspector__section-title"><strong>이미지 에셋</strong><span>선택 즉시 적용</span></div>
-          <div class="landing-asset-grid">${assetItems || '<p>등록된 에셋이 없습니다.</p>'}</div>
+          <div class="landing-inspector__section-title"><strong>사용 가능한 이미지</strong><span>선택 즉시 적용</span></div>
+          <div class="landing-asset-grid">${assetItems || '<p>사용 가능한 이미지가 없습니다. 아래에서 직접 업로드해 주세요.</p>'}</div>
           <label class="landing-upload-button">
             <span>새 이미지 업로드</span>
             <input type="file" accept="image/png,image/jpeg,image/gif,image/webp" data-upload-image />
@@ -373,8 +440,9 @@ ${componentSpacingOverrides}
           ${state.candidateError ? `<p class="landing-inspector__error">${escapeHTML(state.candidateError)}</p>` : ""}
           ${copyCandidates ? `<div class="landing-copy-candidates">${copyCandidates}</div>` : ""}
         `}
+        ${state.saveError ? `<p class="landing-inspector__error">${escapeHTML(state.saveError)}</p>` : ""}
+        ${state.saveNotice ? `<p class="landing-save-status landing-save-status--success">${escapeHTML(state.saveNotice)}</p>` : ""}
         <div class="landing-inspector__actions">
-          <button type="button" class="landing-button landing-button--secondary" data-preview>미리보기</button>
           <button type="button" class="landing-button landing-button--primary" data-save ${state.saveLoading ? "disabled" : ""}>
             ${state.saveLoading ? "저장 중..." : "저장"}
           </button>
@@ -401,11 +469,6 @@ ${componentSpacingOverrides}
         `<div class="landing-drop-zone" data-drop-index="${index + 1}"><span>여기에 컴포넌트 추가</span></div>`,
       ]),
     ].join("");
-    const saveStatus = state.saveError
-      ? `<span class="landing-save-status landing-save-status--error">${escapeHTML(state.saveError)}</span>`
-      : state.saveNotice
-        ? `<span class="landing-save-status landing-save-status--success">${escapeHTML(state.saveNotice)}</span>`
-        : "";
     const preview = state.previewOpen ? `
       <div class="landing-preview" role="dialog" aria-modal="true" aria-label="랜딩 페이지 미리보기">
         <div class="landing-preview__bar">
@@ -430,9 +493,9 @@ ${componentSpacingOverrides}
               <div class="heading-block">
                 <div class="heading-block__titles">
                   <p class="brand-name">IKEA</p>
-                  <h1>Landing Page</h1>
+                  <h1>Campaign Page Workspace</h1>
                 </div>
-                <p class="heading-block__description">AI가 페르소나별 랜딩페이지를 생성했어요. 직접 다듬어 완성해보세요.</p>
+                <p class="heading-block__description">캠페인 페이지가 생성되었어요. 자유롭게 수정할 수 있어요. </p>
               </div>
             </div>
           </div>
@@ -452,22 +515,12 @@ ${componentSpacingOverrides}
           <main class="landing-center">
             <div class="landing-center__tools">
               <div class="landing-editor__tabs" role="tablist" aria-label="페르소나별 랜딩 페이지">${tabs}</div>
-              <div class="landing-editor__actions">
-                <div class="landing-device-toggle" aria-label="디바이스 미리보기">
-                  <button type="button" data-device="desktop" class="${state.device === "desktop" ? "is-active" : ""}">데스크톱</button>
-                  <button type="button" data-device="mobile" class="${state.device === "mobile" ? "is-active" : ""}">모바일</button>
-                </div>
-                ${zoomControlsMarkup("canvas", state.zoom)}
-                ${saveStatus}
-                <button type="button" class="landing-button landing-button--secondary" data-reset-page>기본 구성</button>
-                <button type="button" class="landing-button landing-button--secondary" data-preview>미리보기</button>
-                <button type="button" class="landing-button landing-button--secondary" data-open-preview>새 탭</button>
-                <button type="button" class="landing-button landing-button--secondary" data-download-html>HTML</button>
-              </div>
             </div>
             <section class="landing-intent">
-              <span>✦ AI 의도</span>
-              <p>${escapeHTML(page.ai_intent || "AI가 구성 의도를 제공하지 않았습니다.")}</p>
+              <span>✦ UX 배치 의도</span>
+              <ul class="landing-intent__content">
+                ${personaUXIntentItems(page).map((intent) => `<li>${escapeHTML(intent)}</li>`).join("")}
+              </ul>
             </section>
             <div class="landing-canvas-wrap">
               <div class="landing-canvas-stage" style="--landing-zoom: ${state.zoom}">
@@ -480,6 +533,14 @@ ${componentSpacingOverrides}
           </main>
           <aside class="landing-panel landing-panel--inspector">${inspectorMarkup()}</aside>
         </div>
+        <nav class="landing-export-actions" aria-label="랜딩 페이지 내보내기">
+          <button type="button" class="landing-export-action" data-open-preview>
+            <span>웹으로 보기</span><span class="landing-export-action__icon" aria-hidden="true">↗</span>
+          </button>
+          <button type="button" class="landing-export-action landing-export-action--primary" data-download-html>
+            <span>HTML 추출</span><span class="landing-export-action__icon" aria-hidden="true">→</span>
+          </button>
+        </nav>
       </section>
       ${preview}`;
   }
@@ -646,6 +707,7 @@ ${componentSpacingOverrides}
     const generateCopy = event.target.closest("[data-generate-copy]");
     const copyCandidate = event.target.closest("[data-copy-candidate]");
     const selectAsset = event.target.closest("[data-select-asset]");
+    const selectImage = event.target.closest("[data-select-image]");
     const applyImageAlt = event.target.closest("[data-apply-image-alt]");
     const generateImage = event.target.closest("[data-generate-image]");
     const preview = event.target.closest("[data-preview]");
@@ -708,6 +770,10 @@ ${componentSpacingOverrides}
       const index = components?.findIndex((item) => item.instance_id === card?.dataset.landingComponent);
       if (!components || index < 0) return;
       const action = componentAction.dataset.componentAction;
+      if (action === "edit-image") {
+        selectComponentImage(components[index]);
+        return;
+      }
       if (action === "up" && index > 0) {
         commitMutation(() => components.splice(index - 1, 0, components.splice(index, 1)[0]));
       }
@@ -734,6 +800,7 @@ ${componentSpacingOverrides}
     }
     if (generateCopy) generateCopyCandidates();
     if (selectAsset) applySelectedImage(`asset://${selectAsset.dataset.selectAsset}`);
+    if (selectImage) applySelectedImage(selectImage.dataset.selectImage);
     if (applyImageAlt) applySelectedImage(state.selectedEditable?.value || "");
     if (generateImage) generateImageAsset();
     if (preview) {
@@ -848,6 +915,27 @@ ${componentSpacingOverrides}
       return setTagAttribute(setBackgroundImageOnTag(tag, src), "aria-label", alt);
     });
     return replaced ? html : null;
+  }
+
+  function selectComponentImage(component) {
+    const targets = editableImageTargets(component.html);
+    if (!targets.length) return;
+    const editableTypeIndex = Math.max(0, targets.findIndex((target) => !target.value));
+    const selected = targets[editableTypeIndex];
+    state.selectedInstanceId = component.instance_id;
+    state.selectedEditable = {
+      instanceId: component.instance_id,
+      editableIndex: editableTypeIndex,
+      editableTypeIndex,
+      editableType: "image",
+      value: selected.value,
+      alt: selected.alt,
+      width: 1,
+      height: 1,
+    };
+    state.imagePrompt = "";
+    state.assetError = "";
+    requestRender();
   }
 
   function applySelectedImage(value) {
@@ -1075,12 +1163,23 @@ ${componentSpacingOverrides}
     const components = activePage()?.components;
     if (!template || !components) return;
     commitMutation(() => {
+      const imagePool = availableImageValues();
+      let html = template.html;
+      editableImageTargets(html).forEach((target, imageIndex) => {
+        if (target.value || !imagePool.length) return;
+        html = replaceImageAt(
+          html,
+          imageIndex,
+          imagePool[imageIndex % imagePool.length],
+          target.alt || `${template.name} 이미지 ${imageIndex + 1}`,
+        ) || html;
+      });
       components.splice(index, 0, {
         instance_id: crypto.randomUUID(),
         template_id: template.template_id,
         name: template.name,
         category: template.category,
-        html: template.html,
+        html,
         layout_variant: "source",
         layout_options: template.layout_options || ["source"],
         hidden: false,
