@@ -11,6 +11,8 @@
     future: [],
     draggedInstanceId: "",
     draggedTemplateId: "",
+    draggedDestination: null,
+    draggedRect: null,
     pointerDragging: false,
     copyPrompt: "",
     copyCandidates: [],
@@ -212,7 +214,7 @@
       </label>` : "";
     return `
       <article class="landing-component ${component.hidden ? "landing-component--hidden" : ""} ${state.selectedInstanceId === component.instance_id ? "landing-component--selected" : ""}"
-        data-landing-component="${escapeHTML(component.instance_id)}">
+        data-landing-component="${escapeHTML(component.instance_id)}" data-component-index="${index}">
         <div class="landing-component__toolbar" aria-label="${escapeHTML(component.name)} 설정">
           <button type="button" class="landing-component__drag-handle" data-component-action="drag" title="끌어서 순서 변경">⠿ ${escapeHTML(component.name)}</button>
           <span class="landing-component__toolbar-separator"></span>
@@ -244,6 +246,47 @@
     return labels[value] || value;
   }
 
+  function componentPreviewMarkup(template) {
+    const parsed = new DOMParser().parseFromString(template.html || "", "text/html");
+    const root = Array.from(parsed.body.children).find((item) => item.tagName !== "STYLE");
+    const signature = [
+      template.name,
+      template.category,
+      template.filename,
+      root?.className,
+      root?.id,
+    ].join(" ").toLowerCase();
+    const imageCount = root?.querySelectorAll("img, picture, video").length || 0;
+    const cardCount = root?.querySelectorAll("article, li").length || 0;
+    const hasCTA = Boolean(root?.querySelector("a, button"));
+    let type = "content";
+    if (/carousel|slider|track/.test(signature) || cardCount >= 3) type = "carousel";
+    else if (/bento|masonry/.test(signature)) type = "bento";
+    else if (/hero|visual|masthead/.test(signature)) type = "hero";
+    else if (/cta|banner/.test(signature) || (hasCTA && !imageCount)) type = "cta";
+    else if (imageCount) type = "split";
+
+    const shapes = {
+      hero: `
+        <i class="landing-preview-shape landing-preview-shape--media"></i>
+        <span class="landing-preview-copy"><i></i><i></i><b></b></span>`,
+      carousel: `
+        <span class="landing-preview-heading"><i></i><b></b></span>
+        <span class="landing-preview-cards"><i></i><i></i><i></i></span>`,
+      bento: `
+        <span class="landing-preview-bento"><i></i><i></i><i></i></span>`,
+      cta: `
+        <span class="landing-preview-copy"><i></i><i></i></span>
+        <b class="landing-preview-button"></b>`,
+      split: `
+        <i class="landing-preview-shape landing-preview-shape--media"></i>
+        <span class="landing-preview-copy"><i></i><i></i>${hasCTA ? "<b></b>" : ""}</span>`,
+      content: `
+        <span class="landing-preview-copy landing-preview-copy--wide"><i></i><i></i><i></i></span>`,
+    };
+    return `<span class="landing-library-item__preview landing-library-item__preview--${type}" aria-hidden="true">${shapes[type]}</span>`;
+  }
+
   function libraryMarkup() {
     const query = state.componentQuery.trim().toLowerCase();
     const templates = (state.landing?.component_library || []).filter((template) => (
@@ -255,7 +298,7 @@
     if (!templates.length) return '<p class="landing-panel__empty">사용 가능한 컴포넌트가 없습니다.</p>';
     return templates.map((template) => `
       <button type="button" class="landing-library-item" data-add-template="${escapeHTML(template.template_id)}" draggable="true">
-        <span class="landing-library-item__preview">${escapeHTML(template.category || "Component")}</span>
+        ${componentPreviewMarkup(template)}
         <strong>${escapeHTML(template.name)}</strong>
       </button>`).join("");
   }
@@ -459,7 +502,28 @@
     return editorMarkup();
   }
 
+  let heroScrollBound = false;
+
+  function updateHeroCollapse() {
+    const editor = document.querySelector(".landing-editor");
+    if (!editor) return;
+    const collapse = Math.min(1, Math.max(0, window.scrollY / 166));
+    editor.style.setProperty("--hero-height", `${286 - (166 * collapse)}px`);
+    editor.style.setProperty("--progress-height", `${20 * (1 - collapse)}px`);
+    editor.style.setProperty("--progress-top", `${48 - (32 * collapse)}px`);
+    editor.style.setProperty(
+      "--progress-opacity",
+      Math.max(0, 1 - (collapse * 1.5)).toFixed(3),
+    );
+    editor.style.setProperty("--progress-offset", `${-12 * collapse}px`);
+  }
+
   function mount(root) {
+    if (!heroScrollBound) {
+      window.addEventListener("scroll", updateHeroCollapse, { passive: true });
+      heroScrollBound = true;
+    }
+    updateHeroCollapse();
     const landingId = new URLSearchParams(window.location.search).get("landingId")
       || sessionStorage.getItem("landingId");
     if (!state.landing && !state.loading && !state.error && !state.restoreAttempted && landingId) {
@@ -908,7 +972,10 @@
     if (event.target.matches("[data-image-prompt]")) state.imagePrompt = event.target.value;
     if (event.target.matches("[data-component-search]")) {
       state.componentQuery = event.target.value;
-      requestRender();
+      const library = event.target
+        .closest(".landing-panel--library")
+        ?.querySelector(".landing-library");
+      if (library) library.innerHTML = libraryMarkup();
     }
   });
 
@@ -997,31 +1064,102 @@
   document.addEventListener("dragstart", (event) => {
     const template = event.target.closest("[data-add-template]");
     if (template) {
+      const rect = template.getBoundingClientRect();
       state.draggedTemplateId = template.dataset.addTemplate;
       state.draggedInstanceId = "";
+      state.draggedDestination = null;
+      state.draggedRect = {
+        width: rect.width,
+        height: rect.height,
+        offsetX: event.clientX - rect.left,
+        offsetY: event.clientY - rect.top,
+      };
       event.dataTransfer?.setData("text/plain", state.draggedTemplateId);
       if (event.dataTransfer) event.dataTransfer.effectAllowed = "copy";
+      document.body.classList.add("landing-drag-active");
     }
   });
 
+  function dropTargetAt(element, clientY) {
+    const zone = element?.closest("[data-drop-index]");
+    if (zone) return { destination: Number(zone.dataset.dropIndex), zone };
+    const card = element?.closest("[data-component-index]");
+    if (card) {
+      const index = Number(card.dataset.componentIndex);
+      const destination = clientY < card.getBoundingClientRect().top + card.offsetHeight / 2
+        ? index
+        : index + 1;
+      const adjacentZone = document.querySelector(`[data-drop-index="${destination}"]`);
+      return { destination, zone: adjacentZone };
+    }
+    const canvas = element?.closest("[data-landing-canvas]");
+    if (!canvas) return null;
+    const cards = Array.from(canvas.querySelectorAll("[data-component-index]"));
+    const nextCard = cards.find((item) => (
+      clientY < item.getBoundingClientRect().top + item.offsetHeight / 2
+    ));
+    const destination = nextCard ? Number(nextCard.dataset.componentIndex) : cards.length;
+    const adjacentZone = document.querySelector(`[data-drop-index="${destination}"]`);
+    return { destination, zone: adjacentZone };
+  }
+
+  function overlappingDropTarget(clientX, clientY) {
+    const verticalDropTolerance = 30;
+    const drag = state.draggedRect;
+    const canvas = document.querySelector("[data-landing-canvas]");
+    if (!drag || !canvas) return null;
+    const draggedBounds = {
+      left: clientX - drag.offsetX,
+      right: clientX - drag.offsetX + drag.width,
+      top: clientY - drag.offsetY,
+      bottom: clientY - drag.offsetY + drag.height,
+    };
+    const canvasBounds = canvas.getBoundingClientRect();
+    const overlapsCanvasHorizontally = (
+      draggedBounds.right >= canvasBounds.left
+      && draggedBounds.left <= canvasBounds.right
+    );
+    if (!overlapsCanvasHorizontally) return null;
+    const candidates = Array.from(canvas.querySelectorAll("[data-drop-index]"))
+      .map((zone) => ({
+        zone,
+        destination: Number(zone.dataset.dropIndex),
+        y: zone.getBoundingClientRect().top + zone.offsetHeight / 2,
+      }))
+      .filter((item) => (
+        item.y >= draggedBounds.top - verticalDropTolerance
+        && item.y <= draggedBounds.bottom + verticalDropTolerance
+      ))
+      .sort((a, b) => Math.abs(a.y - clientY) - Math.abs(b.y - clientY));
+    return candidates[0] || null;
+  }
+
   document.addEventListener("dragover", (event) => {
-    const zone = event.target.closest("[data-drop-index]");
-    if (!zone || (!state.draggedInstanceId && !state.draggedTemplateId)) return;
+    const target = overlappingDropTarget(event.clientX, event.clientY)
+      || dropTargetAt(event.target, event.clientY);
+    if (!target || (!state.draggedInstanceId && !state.draggedTemplateId)) return;
     event.preventDefault();
     document.querySelectorAll(".landing-drop-zone--active").forEach((item) => {
       item.classList.remove("landing-drop-zone--active");
     });
-    zone.classList.add("landing-drop-zone--active");
+    state.draggedDestination = target.destination;
+    target.zone?.classList.add("landing-drop-zone--active");
     if (event.dataTransfer) event.dataTransfer.dropEffect = state.draggedTemplateId ? "copy" : "move";
   });
 
   document.addEventListener("drop", (event) => {
-    const zone = event.target.closest("[data-drop-index]");
-    if (!zone) return;
+    const target = overlappingDropTarget(event.clientX, event.clientY)
+      || dropTargetAt(event.target, event.clientY)
+      || (state.draggedDestination === null
+        ? null
+        : { destination: state.draggedDestination, zone: null });
+    if (!target) return;
     event.preventDefault();
-    const destination = Number(zone.dataset.dropIndex);
-    if (state.draggedTemplateId) {
-      addTemplateAt(state.draggedTemplateId, destination);
+    const destination = target.destination;
+    const transferredTemplateId = event.dataTransfer?.getData("text/plain") || "";
+    const templateId = state.draggedTemplateId || transferredTemplateId;
+    if (templateId) {
+      addTemplateAt(templateId, destination);
     } else if (state.draggedInstanceId) {
       const components = activePage()?.components;
       const source = components?.findIndex((item) => item.instance_id === state.draggedInstanceId);
@@ -1037,6 +1175,9 @@
     }
     state.draggedInstanceId = "";
     state.draggedTemplateId = "";
+    state.draggedDestination = null;
+    state.draggedRect = null;
+    document.body.classList.remove("landing-drag-active");
     document.querySelectorAll(".landing-drop-zone--active").forEach((item) => {
       item.classList.remove("landing-drop-zone--active");
     });
@@ -1045,6 +1186,9 @@
   document.addEventListener("dragend", () => {
     state.draggedInstanceId = "";
     state.draggedTemplateId = "";
+    state.draggedDestination = null;
+    state.draggedRect = null;
+    document.body.classList.remove("landing-drag-active");
     document.querySelectorAll(".landing-drop-zone--active").forEach((item) => {
       item.classList.remove("landing-drop-zone--active");
     });
