@@ -1,4 +1,5 @@
 const screens = [
+  "brand-start",
   "brand-input",
   "brand-uploaded",
   "brand-loading",
@@ -10,6 +11,8 @@ const screens = [
   "persona-input",
   "persona-loading",
   "persona-check",
+  "final-check",
+  "landing-editor",
 ];
 
 const brandUploadFields = [
@@ -19,7 +22,8 @@ const brandUploadFields = [
     accept: "application/pdf,.pdf",
     extensions: [".pdf"],
     placeholder: "PDF 파일을 첨부하세요.",
-    caption: "브랜드 정체성과 철학을 확인할 수 있는 PDF를 첨부해 주세요.",
+    caption: "* 브랜드를 이해할 수 있는 (브랜드 비전, 브랜드 성격 등) PDF 파일을 첨부해 주세요. \n" +
+        "* 브랜드의 핵심 가치와 방향성, 타겟 특성을 파악해 캠페인 제작의 기준으로 활용해요. ",
     formatLabel: "PDF",
   },
   {
@@ -28,7 +32,8 @@ const brandUploadFields = [
     accept: "application/pdf,.pdf",
     extensions: [".pdf"],
     placeholder: "PDF 파일을 첨부하세요.",
-    caption: "브랜드 보이스와 문체를 확인할 수 있는 PDF를 첨부해 주세요.",
+    caption: "브랜드의 언어적 성격과 고객과 소통하는 방식(언어 표현 규칙, 지양 어휘 등)을 담은 PDF파일을 첨부해 주세요. \n" +
+        "브랜드의 말투와 표현 원칙을 파악해 캠페인에 반영해요. ",
     formatLabel: "PDF",
   },
   {
@@ -37,7 +42,7 @@ const brandUploadFields = [
     accept: "image/svg+xml,image/png,image/jpeg,.svg,.png,.jpg,.jpeg",
     extensions: [".svg", ".png", ".jpg", ".jpeg"],
     placeholder: "SVG, PNG, JPG 또는 JPEG 파일을 첨부하세요.",
-    caption: "로고 원본 또는 미리보기 이미지를 첨부해 주세요.",
+    caption: "브랜드 로고를 파일로 첨부해 주세요.",
     formatLabel: "SVG, PNG, JPG, JPEG",
   },
   {
@@ -46,7 +51,7 @@ const brandUploadFields = [
     accept: "image/svg+xml,image/png,image/jpeg,.svg,.png,.jpg,.jpeg",
     extensions: [".svg", ".png", ".jpg", ".jpeg"],
     placeholder: "SVG, PNG, JPG 또는 JPEG 파일을 첨부하세요.",
-    caption: "아이콘 원본 또는 미리보기 이미지를 첨부해 주세요.",
+    caption: "브랜드에서 사용하는 아이콘을 파일로 첨부해 주세요.",
     formatLabel: "SVG, PNG, JPG, JPEG",
   },
   {
@@ -55,7 +60,7 @@ const brandUploadFields = [
     accept: "font/ttf,.ttf",
     extensions: [".ttf"],
     placeholder: "TTF 폰트 파일을 첨부하세요.",
-    caption: "브랜드에서 사용하는 TTF 폰트 파일을 첨부해 주세요.",
+    caption: "브랜드에서 사용하는 폰트를 TTF 파일로 첨부해 주세요.",
     formatLabel: "TTF",
   },
 ];
@@ -99,8 +104,8 @@ const campaignUploadFields = [
     title: "Campaign Strategy",
     accept: "application/pdf,.pdf",
     extensions: [".pdf"],
-    placeholder: "캠페인 전략 PDF 1개를 첨부하세요.",
-    caption: "캠페인 배경, 목표, 아이디어와 CTA가 포함된 PDF를 첨부해 주세요.",
+    placeholder: "파일을 첨부하세요.",
+    caption: "캠페인의 구체적인 기획의도와 KPI 등의 정보를 담은 PDF 파일을 첨부해 주세요. \n캠페인 전략을 파악해 웹사이트 생성을 위한 정보로 활용해요.",
     formatLabel: "PDF",
     multiple: false,
     maxFiles: 1,
@@ -108,26 +113,50 @@ const campaignUploadFields = [
   },
   {
     key: "components",
-    title: "Web Components",
-    accept: "text/html,.html,.htm",
-    extensions: [".html", ".htm"],
-    placeholder: "HTML 웹 컴포넌트를 첨부하세요.",
-    caption: "저장할 HTML 웹 컴포넌트를 여러 개 첨부할 수 있습니다.",
-    formatLabel: "HTML",
+    title: "Component Structure",
+    accept: "text/html,application/zip,.html,.htm,.zip",
+    extensions: [".html", ".htm", ".zip"],
+    placeholder: "파일을 첨부하세요.",
+    caption: "웹사이트를 구성하는 컴포넌트 구조 분석을 위하여 HTML 파일을 첨부해 주세요. \n기존 웹사이트 구조의 통일감을 유지하여 캠페인 페이지 생성에 반영해요.",
+    formatLabel: "HTML, ZIP",
     multiple: true,
     maxFiles: 20,
     maxSize: 5 * 1024 * 1024,
   },
   {
+    key: "styles",
+    title: "CSS Styles (Optional)",
+    accept: "text/css,.css",
+    extensions: [".css"],
+    placeholder: "HTML에 연결된 CSS 파일을 첨부하세요.",
+    caption: "선택 항목입니다. 첨부한 CSS는 분리된 모든 컴포넌트에 함께 적용됩니다.",
+    formatLabel: "CSS",
+    multiple: true,
+    maxFiles: 20,
+    maxSize: 2 * 1024 * 1024,
+  },
+  {
     key: "assets",
-    title: "Image Assets",
+    title: "Product Library",
     accept: "image/png,image/jpeg,image/gif,image/webp,.png,.jpg,.jpeg,.gif,.webp",
     extensions: [".png", ".jpg", ".jpeg", ".gif", ".webp"],
-    placeholder: "이미지 파일을 첨부하세요.",
-    caption: "PNG, JPG, JPEG, GIF 또는 WEBP 이미지를 여러 개 첨부할 수 있습니다.",
+    placeholder: "파일을 첨부하세요.",
+    caption: "캠페인에 사용될 제품컷, 라이프스타일컷 등을 PNG 형태로 첨부해 주세요.",
     formatLabel: "PNG, JPG, JPEG, GIF, WEBP",
     multiple: true,
     maxFiles: 50,
+    maxSize: 20 * 1024 * 1024,
+  },
+  {
+    key: "bundles",
+    title: "Asset Bundle (Optional)",
+    accept: "application/zip,.zip",
+    extensions: [".zip"],
+    placeholder: "HTML, CSS, 이미지가 담긴 ZIP을 첨부하세요.",
+    caption: "선택 항목입니다. ZIP 내부의 HTML, CSS, 이미지를 자동으로 분류합니다.",
+    formatLabel: "ZIP",
+    multiple: true,
+    maxFiles: 5,
     maxSize: 20 * 1024 * 1024,
   },
 ];
@@ -153,6 +182,7 @@ const personaReviewFields = [
 ];
 
 const brandState = {
+  name: sessionStorage.getItem("brandName") || "",
   files: Object.fromEntries(brandUploadFields.map(({ key }) => [key, []])),
   colors: [],
   colorDraft: "",
@@ -167,6 +197,7 @@ const campaignState = {
   markdown: "",
   error: "",
   notice: "",
+  referenceUrl: "",
 };
 const personaState = {
   inputs: [""],
@@ -176,6 +207,10 @@ const personaState = {
   loadingPhase: 0,
   error: "",
   notice: "",
+};
+const finalCheckState = {
+  openSection: "",
+  openPersonaIndex: 0,
 };
 const flowState = {
   projectId: sessionStorage.getItem("projectId") || "",
@@ -236,6 +271,7 @@ function progressMarkup(progress) {
 }
 
 function brandWorkspaceLabel() {
+  if (brandState.name.trim()) return brandState.name.trim();
   const sourceName = brandState.analysis?.source_files?.[0]
     || allBrandFiles()[0]?.name;
   return sourceName
@@ -244,6 +280,7 @@ function brandWorkspaceLabel() {
 }
 
 function workspaceLabel() {
+  if (brandState.name.trim()) return brandState.name.trim();
   if (currentIndex >= screens.indexOf("campaign-input")) {
     const sourceName = campaignState.analysis?.source_file
       || campaignState.files.strategy[0]?.name;
@@ -264,6 +301,35 @@ function headerMarkup(title, description, progress) {
         <p class="heading-block__description">${description}</p>
       </div>
     </header>`;
+}
+
+function brandStartMarkup() {
+  return `
+    <div class="screen-content screen-content--brand-start">
+      <div class="brand-start-content">
+        <div class="brand-start-heading">
+          <div class="brand-start-logo" aria-label="Blanky">
+            <span>Blanky</span>
+            <img src="assets/blanky-mark.svg?v=3" alt="" />
+          </div>
+          <h1>브랜드 명을 채우면 Blanky가 시작됩니다</h1>
+        </div>
+        <form class="brand-start-form" onsubmit="return false">
+          <input
+            type="text"
+            data-brand-name
+            value="${escapeHTML(brandState.name)}"
+            placeholder="브랜드 명을 입력해 주세요"
+            aria-label="브랜드명"
+            autocomplete="organization"
+          />
+          <button type="button" data-brand-start-submit aria-label="브랜드 입력 후 시작">
+            <img src="assets/arrow-right-white.svg" alt="" />
+          </button>
+        </form>
+        ${feedbackMarkup()}
+      </div>
+    </div>`;
 }
 
 function feedbackMarkup() {
@@ -354,7 +420,6 @@ function colorInput() {
         ${brandState.colors.map((color, index) => `
           <div class="brand-color-chip">
             <span class="brand-color-chip__swatch" style="background:${color}" aria-hidden="true"></span>
-            <span class="brand-color-chip__value">${color}</span>
             <button type="button" data-remove-color data-color-index="${index}" aria-label="${color} 색상 삭제">×</button>
           </div>`).join("")}
       </div>`
@@ -411,7 +476,7 @@ function brandInputMarkup(isUploaded) {
 
   return `
     <div class="screen-content">
-      ${headerMarkup("Brand Knowledge Input", "브랜드 가이드 PDF를 업로드하면 AI가 검토 가능한 항목으로 정리합니다.", [0.5, 0, 0, 0, 0])}
+      ${headerMarkup("Brand Knowledge", "브랜드의 정체성, 언어, 디자인 가이드 관련 자료를 추가해 주세요.", [0.5, 0, 0, 0, 0])}
       ${feedbackMarkup()}
       <form class="input-form ${isUploaded ? "input-form--uploaded" : ""}" onsubmit="return false">
         <section class="file-section"><h2>Brand Identity</h2><div class="file-section__body">${brandFilesMarkup("brand_identity")}</div></section>
@@ -423,7 +488,7 @@ function brandInputMarkup(isUploaded) {
             <li class="visual-field">
               <span class="visual-field__name">Color</span>
               ${colorInput()}
-              <span class="field-caption">HEX 값을 입력하거나 색상 선택기·스포이트로 브랜드 색상을 추가해 주세요.</span>
+              <span class="field-caption">브랜드 컬러를 선택해 주세요. (HEX 코드 입력 가능)</span>
             </li>
           </ol>
         </section>
@@ -626,37 +691,43 @@ function actualCampaignReviewMarkup() {
   }).join("");
   return `
     <section class="review-section">
-      <div class="review-section__title"><h2>Campaign Knowledge</h2></div>
+      <div class="review-section__title"><h2>Campaign Strategy</h2></div>
       <div class="review-section__items">${items}</div>
     </section>`;
 }
 
 function checkMarkup(type) {
   const isBrand = type === "brand";
-  const title = isBrand ? "Brand Knowledge Check" : "Campaign Knowledge Check";
+  const title = isBrand ? "Brand Knowledge Review" : "Campaign Strategy Review";
+  const description = isBrand
+    ? "AI가 정리한 브랜드 정보를 확인해 주세요. 자유롭게 수정이 가능해요."
+    : "AI가 정리한 캠페인 전략 정보를 확인해 주세요. 자유롭게 수정이 가능해요.";
   const progress = isBrand ? [1, 0, 0, 0, 0] : [1, 1, 0, 0, 0];
   const sections = isBrand
     ? actualBrandReviewMarkup()
     : actualCampaignReviewMarkup();
   return `
     <div class="screen-content screen-content--review">
-      ${headerMarkup(title, "AI가 분석한 정보를 확인하고 필요한 내용을 수정해 주세요.", progress)}
+      ${headerMarkup(title, description, progress)}
       ${feedbackMarkup()}
       <div class="review-area">${sections}</div>
     </div>`;
 }
 
 function campaignInputMarkup(isUploaded) {
-  const sectionMarkup = campaignUploadFields.map((field) => `
+  const visibleFields = campaignUploadFields.filter((field) => ["strategy", "components", "assets"].includes(field.key));
+  const sectionMarkup = visibleFields.map((field) => `
     <section class="file-section">
       <div class="file-section__heading"><h2>${field.title}</h2></div>
       <div class="file-section__body">${campaignFilesMarkup(field, isUploaded)}</div>
     </section>`).join("");
   return `
-    <div class="screen-content">
-      ${headerMarkup("Campaign Knowledge Input", "캠페인 정보를 입력해 주세요.", [1, 0.5, 0, 0, 0])}
+    <div class="screen-content screen-content--campaign-input">
+      ${headerMarkup("Campaign Strategy", "제작하고자 하는 캠페인 관련 정보 및 자료를 추가해 주세요.", [1, 0.5, 0, 0, 0])}
       ${feedbackMarkup()}
-      <form class="input-form campaign-form ${isUploaded ? "input-form--uploaded" : ""}">${sectionMarkup}</form>
+      <form class="input-form campaign-form ${isUploaded ? "input-form--uploaded" : ""}">
+        ${sectionMarkup}
+      </form>
     </div>`;
 }
 
@@ -703,12 +774,12 @@ function personaInputMarkup() {
         >${escapeHTML(value)}</textarea>
         <img class="textarea-grip" src="assets/grip.svg" alt="" />
       </div>
-      <p class="persona-input-caption">자연어로 입력하면 AI가 항목별로 분류하고 브랜드·캠페인 맥락을 반영해 보완합니다.</p>
+      <p class="persona-input-caption">텍스트 형식으로 입력해 주세요. (나이 / 성별 / 상황 / 핵심 니즈 / 페인 포인트 / 관심사 / 비선호 / 구매 여정 등)</p>
     </section>`).join("");
   const canAdd = personaState.inputs.length < 5;
   return `
     <div class="screen-content screen-content--persona-input">
-      ${headerMarkup("Persona", "타깃으로 생각하는 사람의 특징을 자유롭게 입력해 주세요.", [1, 1, 0.5, 0, 0])}
+      ${headerMarkup("Persona Setup", "타겟팅하고 싶은 페르소나 정보를 자유롭게 작성해 주세요.", [1, 1, 0.5, 0, 0])}
       ${feedbackMarkup()}
       <form class="persona-form" onsubmit="return false">
         ${areas}
@@ -756,12 +827,37 @@ function personaReviewItem(index, title, items, attribute, fieldKey) {
     </div>`;
 }
 
+function personaAppendixReviewItem(persona) {
+  const purchaseJourney = persona.appendix?.purchase_journey || [];
+  const dislikes = persona.appendix?.dislikes || [];
+  const content = personaBulletText([...purchaseJourney, ...dislikes]);
+  return `
+    <div class="review-item persona-review-item persona-appendix-review-item">
+      <div class="review-item__header">
+        <span>7. Appendix</span>
+        <button class="refresh-button" type="button" data-refresh>
+          <img src="assets/refresh.svg" alt="" /><span>원문 복원</span>
+        </button>
+      </div>
+      <div class="textarea-wrap">
+        <textarea
+          class="review-textarea persona-review-textarea"
+          data-persona-appendix-combined
+          data-appendix-purchase-count="${purchaseJourney.length}"
+          data-original-value="${escapeHTML(content)}"
+          aria-label="Appendix"
+        >${escapeHTML(content)}</textarea>
+        <img class="textarea-grip" src="assets/grip.svg" alt="" />
+      </div>
+    </div>`;
+}
+
 function personaCheckMarkup() {
   const personas = personaState.analysis?.data?.personas;
   if (!personas?.length) {
     return `
       <div class="screen-content screen-content--review">
-        ${headerMarkup("Persona Check", "AI가 생성한 페르소나를 확인해 주세요.", [1, 1, 1, 0, 0])}
+        ${headerMarkup("Persona Review", "AI가 생성한 페르소나를 확인해 주세요.", [1, 1, 1, 0, 0])}
         ${feedbackMarkup()}
         <div class="api-feedback api-feedback--error" role="alert">생성 결과를 찾을 수 없습니다. 페르소나를 다시 입력해 주세요.</div>
       </div>`;
@@ -779,24 +875,121 @@ function personaCheckMarkup() {
   const primaryItems = personaReviewFields.map(([fieldKey, label], index) => (
     personaReviewItem(index + 1, label, active[fieldKey], "data-persona-field", fieldKey)
   )).join("");
-  const appendixItems = [
-    personaReviewItem(1, "Purchase Journey", active.appendix.purchase_journey, "data-persona-appendix-field", "purchase_journey"),
-    personaReviewItem(2, "Dislikes", active.appendix.dislikes, "data-persona-appendix-field", "dislikes"),
-  ].join("");
+  const appendixItem = personaAppendixReviewItem(active);
   return `
     <div class="screen-content screen-content--review screen-content--persona-review">
-      ${headerMarkup("Persona Check", "AI가 분류하고 추론한 정보를 확인한 뒤 필요한 내용을 수정해 주세요.", [1, 1, 1, 0, 0])}
+      ${headerMarkup("Persona Review", "AI가 만든 페르소나 별 특징을 자유롭게 수정할 수 있어요.", [1, 1, 1, 0, 0])}
       ${feedbackMarkup()}
       <div class="persona-tabs" role="tablist" aria-label="생성된 페르소나">${tabs}</div>
       <div class="review-area persona-review-area" role="tabpanel">
         <section class="review-section">
           <div class="review-section__title"><h2>${escapeHTML(active.name)}</h2></div>
-          <div class="review-section__items">${primaryItems}</div>
+          <div class="review-section__items">${primaryItems}${appendixItem}</div>
         </section>
-        <section class="review-section">
-          <div class="review-section__title"><h2>Appendix</h2></div>
-          <div class="review-section__items">${appendixItems}</div>
-        </section>
+      </div>
+    </div>`;
+}
+
+function finalCheckRows(rows) {
+  return rows.map(({ label, value }, index) => {
+    const values = Array.isArray(value) ? value : [value];
+    const content = values.filter(Boolean).map((item) => `<p>${escapeHTML(item)}</p>`).join("");
+    return `
+      <div class="final-check-row">
+        <strong>${index + 1}. ${escapeHTML(label)}</strong>
+        <div>${content || '<p class="final-check-row__empty">내용 없음</p>'}</div>
+      </div>`;
+  }).join("");
+}
+
+function finalCheckSection(key, title, rows) {
+  const isOpen = finalCheckState.openSection === key;
+  return `
+    <section class="final-check-section ${isOpen ? "final-check-section--open" : ""}">
+      <div class="final-check-section__header">
+        <button type="button" class="final-check-section__toggle" data-final-toggle="${key}" aria-expanded="${isOpen}">
+          <img src="assets/chevron-right.svg" alt="" />
+          <span>${escapeHTML(title)}</span>
+        </button>
+        <button type="button" class="final-check-section__edit" data-final-edit="${key}" aria-label="${escapeHTML(title)} 수정">
+          <img src="assets/edit-filled.svg" alt="" />
+        </button>
+      </div>
+      ${isOpen ? `<div class="final-check-section__body">${finalCheckRows(rows)}</div>` : ""}
+    </section>`;
+}
+
+function finalPersonaMarkup(personas) {
+  if (!personas.length) {
+    return '<p class="final-check-row__empty">생성된 페르소나가 없습니다.</p>';
+  }
+
+  if (finalCheckState.openPersonaIndex >= personas.length) {
+    finalCheckState.openPersonaIndex = 0;
+  }
+
+  return personas.map((persona, index) => {
+    const isOpen = finalCheckState.openPersonaIndex === index;
+    const rows = [
+      ...personaReviewFields.map(([fieldKey, label]) => ({
+        label,
+        value: persona[fieldKey] || [],
+      })),
+      { label: "Purchase Journey", value: persona.appendix?.purchase_journey || [] },
+      { label: "Dislikes", value: persona.appendix?.dislikes || [] },
+    ];
+
+    return `
+      <section class="final-persona ${isOpen ? "final-persona--open" : ""}">
+        <button
+          type="button"
+          class="final-persona__toggle"
+          data-final-persona-toggle="${index}"
+          aria-expanded="${isOpen}"
+        >
+          <img src="assets/chevron-right.svg" alt="" />
+          <span>${index + 1}. ${escapeHTML(persona.name || `Persona ${index + 1}`)}</span>
+        </button>
+        ${isOpen ? `<div class="final-persona__body">${finalCheckRows(rows)}</div>` : ""}
+      </section>`;
+  }).join("");
+}
+
+function finalPersonaSection(personas) {
+  const isOpen = finalCheckState.openSection === "persona";
+  return `
+    <section class="final-check-section ${isOpen ? "final-check-section--open" : ""}">
+      <div class="final-check-section__header">
+        <button type="button" class="final-check-section__toggle" data-final-toggle="persona" aria-expanded="${isOpen}">
+          <img src="assets/chevron-right.svg" alt="" />
+          <span>Persona</span>
+        </button>
+        <button type="button" class="final-check-section__edit" data-final-edit="persona" aria-label="Persona 수정">
+          <img src="assets/edit-filled.svg" alt="" />
+        </button>
+      </div>
+      ${isOpen ? `<div class="final-check-section__body final-check-section__body--persona">${finalPersonaMarkup(personas)}</div>` : ""}
+    </section>`;
+}
+
+function finalCheckMarkup() {
+  const brandRows = Object.entries(brandReviewFields).flatMap(([groupKey, group]) => (
+    group.fields.map(([fieldKey, label]) => {
+      return { label, value: brandState.analysis?.data?.[groupKey]?.[fieldKey]?.content || "" };
+    })
+  ));
+  const campaignRows = campaignReviewFields.map(([fieldKey, label]) => ({
+    label,
+    value: campaignState.analysis?.data?.[fieldKey]?.content || "",
+  }));
+  const personas = personaState.analysis?.data?.personas || [];
+  return `
+    <div class="screen-content screen-content--final-check">
+      ${headerMarkup("Final Review", "브랜드 정보, 캠페인 정보, 페르소나 정보를 최종적으로 확인해 보세요.", [1, 1, 1, 1, 0])}
+      <div class="final-check-list">
+        ${finalCheckSection("brand", "Brand Identity", brandRows)}
+        ${finalCheckSection("campaign", "Campaign Strategy", campaignRows)}
+        ${finalPersonaSection(personas)}
       </div>
     </div>`;
 }
@@ -806,6 +999,7 @@ function render() {
   const screen = screens[currentIndex];
   document.body.dataset.screen = screen;
   const renderScreen = {
+    "brand-start": brandStartMarkup,
     "brand-input": () => brandInputMarkup(false),
     "brand-uploaded": () => brandInputMarkup(true),
     "brand-loading": () => loadingMarkup("brand"),
@@ -817,9 +1011,12 @@ function render() {
     "persona-input": personaInputMarkup,
     "persona-loading": () => loadingMarkup("persona"),
     "persona-check": personaCheckMarkup,
+    "final-check": finalCheckMarkup,
+    "landing-editor": () => window.LandingEditor.markup(),
   }[screen];
 
   app.innerHTML = renderScreen();
+  if (screen === "landing-editor") window.LandingEditor.mount(app);
   window.scrollTo(0, 0);
   updateNavigation(screen);
   if (screen === "persona-loading" && personaState.loadingPhase < personaState.inputs.length - 1) {
@@ -831,15 +1028,15 @@ function render() {
 }
 
 function updateNavigation(screen) {
-  navigation.hidden = screen.endsWith("-loading");
-  previousButton.hidden = currentIndex < 2;
-  previousButton.disabled = false;
+  navigation.hidden = screen === "brand-start" || screen.endsWith("-loading") || screen === "landing-editor";
+  previousButton.hidden = false;
+  previousButton.disabled = currentIndex === 0;
+  previousButton.querySelector("span").textContent = "이전";
   nextButton.disabled = false;
-  const personaComplete = screen === "persona-check" && personaState.analysis?.status === "finalized";
-  nextButton.disabled = personaComplete;
-  nextButton.querySelector("span").textContent = personaComplete
-    ? "완료"
-    : screen.endsWith("-check") ? "확정" : "Next";
+  nextButton.disabled = false;
+  nextButton.querySelector("span").textContent = screen === "final-check"
+    ? "랜딩페이지 생성"
+    : "다음";
 }
 
 async function analyzeBrand() {
@@ -847,7 +1044,7 @@ async function analyzeBrand() {
   const visualFiles = brandVisualFiles();
   if (!documents.length) {
     brandState.error = "분석할 PDF 파일을 한 개 이상 첨부해 주세요.";
-    routeTo(0);
+    routeTo(screens.indexOf("brand-input"));
     return;
   }
   if (documents.length > 10) {
@@ -863,7 +1060,7 @@ async function analyzeBrand() {
 
   brandState.error = "";
   brandState.notice = "";
-  routeTo(2);
+  routeTo(3);
   try {
     brandState.analysis = await window.BrandAPI.analyze({
       documents,
@@ -874,10 +1071,10 @@ async function analyzeBrand() {
     });
     flowState.projectId = brandState.analysis.project_id;
     sessionStorage.setItem("projectId", flowState.projectId);
-    routeTo(3);
+    routeTo(4);
   } catch (error) {
     brandState.error = error.message;
-    routeTo(1);
+    routeTo(2);
   }
 }
 
@@ -907,7 +1104,7 @@ async function finalizeBrand() {
     const finalized = await window.BrandAPI.finalize(brandState.analysis.brand_id);
     brandState.markdown = finalized.markdown;
     brandState.notice = "Brand Knowledge 검토가 완료되어 brand.md를 생성했습니다.";
-    routeTo(4);
+    routeTo(5);
   } catch (error) {
     brandState.error = error.message;
     render();
@@ -916,31 +1113,50 @@ async function finalizeBrand() {
 
 async function analyzeCampaign() {
   const strategyFile = campaignState.files.strategy[0];
+  const componentFiles = campaignState.files.components.filter(
+    (file) => !file.name.toLowerCase().endsWith(".zip"),
+  );
+  const componentBundles = campaignState.files.components.filter(
+    (file) => file.name.toLowerCase().endsWith(".zip"),
+  );
   const projectId = flowState.projectId || brandState.analysis?.project_id;
   if (!projectId) {
     campaignState.error = "브랜드 분석 후 캠페인 전략을 입력해 주세요.";
-    routeTo(4);
+    routeTo(5);
     return;
   }
   if (!strategyFile) {
     campaignState.error = "캠페인 전략 PDF 1개를 첨부해 주세요.";
-    routeTo(4);
+    routeTo(5);
+    return;
+  }
+  if (!campaignState.files.components.length) {
+    campaignState.error = "랜딩에 사용할 HTML 파일을 한 개 이상 첨부해 주세요.";
+    routeTo(5);
+    return;
+  }
+  if (campaignState.referenceUrl && !/^https?:\/\//i.test(campaignState.referenceUrl.trim())) {
+    campaignState.error = "Reference URL은 http:// 또는 https://로 시작해야 합니다.";
+    routeTo(5);
     return;
   }
   campaignState.error = "";
   campaignState.notice = "";
-  routeTo(6);
+  routeTo(7);
   try {
     campaignState.analysis = await window.CampaignAPI.analyze({
       projectId,
       strategyFile,
-      componentFiles: campaignState.files.components,
+      componentFiles,
+      styleFiles: campaignState.files.styles,
       assetFiles: campaignState.files.assets,
+      bundleFiles: [...campaignState.files.bundles, ...componentBundles],
+      referenceUrl: campaignState.referenceUrl.trim(),
     });
-    routeTo(7);
+    routeTo(8);
   } catch (error) {
     campaignState.error = error.message;
-    routeTo(5);
+    routeTo(6);
   }
 }
 
@@ -1028,7 +1244,7 @@ async function finalizePersonas() {
     personaState.analysis.status = finalized.status;
     personaState.markdownFiles = finalized.files;
     personaState.notice = `${finalized.files.map((item) => item.filename).join(", ")} 파일을 생성했습니다.`;
-    render();
+    routeTo(screens.indexOf("final-check"));
   } catch (error) {
     personaState.error = error.message;
     render();
@@ -1054,7 +1270,7 @@ function addBrandColor(value) {
   brandState.colorDraft = "";
   brandState.error = "";
   brandState.notice = "";
-  routeTo(1);
+  routeTo(2);
 }
 
 async function pickColorFromScreen() {
@@ -1080,13 +1296,22 @@ previousButton.addEventListener("click", () => {
 
 nextButton.addEventListener("click", async () => {
   const screen = screens[currentIndex];
+  if (screen === "brand-start") {
+    if (!brandState.name.trim()) {
+      brandState.error = "브랜드명을 입력해 주세요.";
+      render();
+      return;
+    }
+    routeTo(screens.indexOf("brand-input"));
+    return;
+  }
   if (screen === "brand-input") {
     if (!brandDocumentFiles().length) {
       brandState.error = "분석할 PDF 파일을 한 개 이상 첨부해 주세요.";
       render();
       return;
     }
-    routeTo(1);
+    routeTo(2);
     return;
   }
   if (screen === "brand-uploaded") {
@@ -1103,7 +1328,12 @@ nextButton.addEventListener("click", async () => {
       render();
       return;
     }
-    routeTo(5);
+    if (!campaignState.files.components.length) {
+      campaignState.error = "랜딩에 사용할 HTML 파일을 한 개 이상 첨부해 주세요.";
+      render();
+      return;
+    }
+    routeTo(6);
     return;
   }
   if (screen === "campaign-uploaded") {
@@ -1120,6 +1350,12 @@ nextButton.addEventListener("click", async () => {
   }
   if (screen === "persona-check") {
     await finalizePersonas();
+    return;
+  }
+  if (screen === "final-check") {
+    routeTo(screens.indexOf("landing-editor"));
+    await window.LandingEditor.create(flowState.projectId);
+    render();
     return;
   }
   if (currentIndex < screens.length - 1) routeTo(currentIndex + 1);
@@ -1139,6 +1375,42 @@ app.addEventListener("click", async (event) => {
   const addPersona = event.target.closest("[data-add-persona]");
   const removePersona = event.target.closest("[data-remove-persona]");
   const personaTab = event.target.closest("[data-persona-tab]");
+  const finalToggle = event.target.closest("[data-final-toggle]");
+  const finalPersonaToggle = event.target.closest("[data-final-persona-toggle]");
+  const finalEdit = event.target.closest("[data-final-edit]");
+  const brandStartSubmit = event.target.closest("[data-brand-start-submit]");
+
+  if (brandStartSubmit) {
+    if (!brandState.name.trim()) {
+      brandState.error = "브랜드명을 입력해 주세요.";
+      render();
+    } else {
+      routeTo(screens.indexOf("brand-input"));
+    }
+    return;
+  }
+
+  if (finalToggle) {
+    finalCheckState.openSection = finalCheckState.openSection === finalToggle.dataset.finalToggle
+      ? ""
+      : finalToggle.dataset.finalToggle;
+    render();
+  }
+  if (finalPersonaToggle) {
+    const personaIndex = Number(finalPersonaToggle.dataset.finalPersonaToggle);
+    finalCheckState.openPersonaIndex = finalCheckState.openPersonaIndex === personaIndex
+      ? -1
+      : personaIndex;
+    render();
+  }
+  if (finalEdit) {
+    const targetIndex = {
+      brand: screens.indexOf("brand-check"),
+      campaign: screens.indexOf("campaign-check"),
+      persona: screens.indexOf("persona-check"),
+    }[finalEdit.dataset.finalEdit];
+    if (Number.isInteger(targetIndex)) routeTo(targetIndex);
+  }
 
   if (addPersona && personaState.inputs.length < 5) {
     personaState.inputs.push("");
@@ -1216,10 +1488,21 @@ app.addEventListener("change", (event) => {
     const group = campaignInput.dataset.campaignGroup;
     const config = campaignUploadFields.find((field) => field.key === group);
     const selectedFiles = Array.from(campaignInput.files);
+    const bundleConfig = campaignUploadFields.find((field) => field.key === "bundles");
     const invalidFile = selectedFiles.find((file) => !config.extensions.some(
       (extension) => file.name.toLowerCase().endsWith(extension),
     ));
-    const oversizedFile = selectedFiles.find((file) => file.size > config.maxSize);
+    const oversizedFile = selectedFiles.find((file) => {
+      const maxSize = group === "components" && file.name.toLowerCase().endsWith(".zip")
+        ? bundleConfig.maxSize
+        : config.maxSize;
+      return file.size > maxSize;
+    });
+    const nextBundleCount = group === "components"
+      ? [...campaignState.files.components, ...selectedFiles].filter(
+        (file) => file.name.toLowerCase().endsWith(".zip"),
+      ).length
+      : 0;
     const nextCount = config.multiple
       ? campaignState.files[group].length + selectedFiles.length
       : selectedFiles.length;
@@ -1233,6 +1516,11 @@ app.addEventListener("change", (event) => {
       render();
       return;
     }
+    if (nextBundleCount > bundleConfig.maxFiles) {
+      campaignState.error = `${config.title}: ZIP 파일은 최대 ${bundleConfig.maxFiles}개까지 첨부할 수 있습니다.`;
+      render();
+      return;
+    }
     if (nextCount > config.maxFiles) {
       campaignState.error = `${config.title}: 최대 ${config.maxFiles}개까지 첨부할 수 있습니다.`;
       render();
@@ -1242,7 +1530,7 @@ app.addEventListener("change", (event) => {
       ? [...campaignState.files[group], ...selectedFiles]
       : selectedFiles.slice(0, 1);
     campaignState.error = "";
-    routeTo(5);
+    routeTo(6);
     return;
   }
 
@@ -1275,12 +1563,21 @@ app.addEventListener("change", (event) => {
 
   brandState.files[group].push(...selectedFiles);
   brandState.error = "";
-  routeTo(1);
+  routeTo(2);
 });
 
 app.addEventListener("input", (event) => {
+  if (event.target.matches("[data-brand-name]")) {
+    brandState.name = event.target.value;
+    sessionStorage.setItem("brandName", brandState.name);
+    brandState.error = "";
+  }
   if (event.target.matches("[data-brand-path]")) brandState.error = "";
   if (event.target.matches("[data-campaign-path]")) campaignState.error = "";
+  if (event.target.matches("[data-campaign-reference-url]")) {
+    campaignState.referenceUrl = event.target.value;
+    campaignState.error = "";
+  }
   if (event.target.matches("[data-persona-input]")) {
     personaState.inputs[Number(event.target.dataset.personaInput)] = event.target.value;
     personaState.error = "";
@@ -1290,9 +1587,15 @@ app.addEventListener("input", (event) => {
     persona[event.target.dataset.personaField] = parsePersonaBulletText(event.target.value);
     personaState.error = "";
   }
-  if (event.target.matches("[data-persona-appendix-field]")) {
+  if (event.target.matches("[data-persona-appendix-combined]")) {
     const persona = personaState.analysis.data.personas[personaState.activeIndex];
-    persona.appendix[event.target.dataset.personaAppendixField] = parsePersonaBulletText(event.target.value);
+    const items = event.target.value
+      .split("\n")
+      .map((item) => item.replace(/^\s*[•*-]\s*/, "").trim())
+      .filter(Boolean);
+    const purchaseCount = Number(event.target.dataset.appendixPurchaseCount) || 0;
+    persona.appendix.purchase_journey = items.slice(0, purchaseCount);
+    persona.appendix.dislikes = items.slice(purchaseCount);
     personaState.error = "";
   }
   if (event.target.matches("[data-color-hex]")) {
@@ -1308,6 +1611,10 @@ app.addEventListener("change", (event) => {
 });
 
 app.addEventListener("keydown", (event) => {
+  if (event.target.matches("[data-brand-name]") && event.key === "Enter") {
+    event.preventDefault();
+    app.querySelector("[data-brand-start-submit]")?.click();
+  }
   if (event.target.matches("[data-color-hex]") && event.key === "Enter") {
     event.preventDefault();
     addBrandColor(event.target.value);
@@ -1317,6 +1624,10 @@ app.addEventListener("keydown", (event) => {
 window.addEventListener("hashchange", () => {
   currentIndex = getIndexFromHash();
   render();
+});
+
+window.addEventListener("landing-editor-change", () => {
+  if (screens[currentIndex] === "landing-editor") render();
 });
 
 if (!window.location.hash) window.history.replaceState(null, "", `#${screens[0]}`);

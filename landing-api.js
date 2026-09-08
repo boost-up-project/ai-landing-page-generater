@@ -1,4 +1,4 @@
-(function initializePersonaApi() {
+(function initializeLandingApi() {
   const metaBaseUrl = document
     .querySelector('meta[name="api-base-url"]')
     ?.getAttribute("content");
@@ -30,33 +30,55 @@
     return body;
   }
 
-  window.PersonaAPI = {
-    async analyze(projectId, inputs) {
-      return request("/personas", {
+  window.LandingAPI = {
+    async create(projectId) {
+      return request("/landings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project_id: projectId, inputs }),
+        body: JSON.stringify({ project_id: projectId }),
       });
     },
 
-    async get(personaId) {
-      return request(`/personas/${personaId}`);
+    async get(landingId) {
+      return request(`/landings/${landingId}`);
     },
 
-    async review(personaId, data) {
-      return request(`/personas/${personaId}/review`, {
+    async save(landingId, pages) {
+      return request(`/landings/${landingId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data }),
+        body: JSON.stringify({ pages }),
       });
     },
 
-    async finalize(personaId) {
-      return request(`/personas/${personaId}/finalize`, { method: "POST" });
+    async copyCandidates(landingId, payload) {
+      return request(`/landings/${landingId}/copy-candidates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
     },
 
-    async getMarkdown(personaId) {
-      return request(`/personas/${personaId}/markdown`);
+    async uploadAsset(landingId, file) {
+      const formData = new FormData();
+      formData.append("file", file, file.name);
+      return request(`/landings/${landingId}/assets/upload`, {
+        method: "POST",
+        body: formData,
+      });
+    },
+
+    async generateAsset(landingId, payload) {
+      return request(`/landings/${landingId}/assets/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+
+    assetUrl(landingId, filename) {
+      if (!baseUrl) return "";
+      return `${baseUrl}/landings/${encodeURIComponent(landingId)}/assets/${encodeURIComponent(filename)}`;
     },
   };
 }());
