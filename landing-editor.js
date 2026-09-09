@@ -29,14 +29,14 @@
     zoom: 0.8,
     previewZoom: 0.7,
     componentQuery: "",
-    device: "desktop",
     initialPages: [],
   };
 
-  const zoomMin = 0.5;
+  const zoomMin = 0.3;
   const zoomMax = 1.5;
   const zoomStep = 0.1;
-  const componentSpacingOverrides = `<style>
+  let canvasResizeObserver;
+  const editorComponentSpacingOverrides = `<style>
     [data-editable="copy"] {
       word-break: keep-all !important;
       overflow-wrap: break-word !important;
@@ -45,12 +45,40 @@
     h4[data-editable="copy"], h5[data-editable="copy"], h6[data-editable="copy"] {
       text-wrap: balance;
     }
-    [data-component-category]:not(header) {
+    [data-component-category]:not([data-component-category="header"]) {
       width: auto !important;
       margin-inline: 46px !important;
     }
-    body > [data-component-category]:not(header) ~ [data-component-category]:not(header) {
+    body > [data-component-category]:not([data-component-category="header"]) ~ [data-component-category]:not([data-component-category="header"]) {
       margin-top: 64px !important;
+    }
+  </style>`;
+  const outputDocumentBaseStyles = `<style>
+    :root {
+      --landing-content-max: 1440px;
+      --landing-content-width: calc(100% - 80px);
+      --landing-section-gap: 64px;
+    }
+    html, body { width: 100%; min-height: 100%; margin: 0; padding: 0; overflow-x: hidden; }
+    *, *::before, *::after { box-sizing: border-box; }
+    img, picture, video, canvas, svg { max-width: 100%; }
+    img, video, canvas { height: auto; }
+    [data-component-category] { max-width: 100%; min-width: 0; }
+    body > [data-component-category]:not([data-component-category="header"]) {
+      width: min(var(--landing-content-width), var(--landing-content-max)) !important;
+      margin-inline: auto !important;
+    }
+    body > [data-component-category]:not([data-component-category="header"]) ~ [data-component-category]:not([data-component-category="header"]) {
+      margin-top: var(--landing-section-gap);
+    }
+    @media (max-width: 900px) {
+      :root { --landing-content-width: calc(100% - 32px); --landing-section-gap: 40px; }
+      body > [data-component-category]:not([data-component-category="header"]) { width: var(--landing-content-width) !important; }
+      [data-component-category] [style*="width"],
+      [data-component-category] [style*="min-width"] { max-width: 100% !important; min-width: 0 !important; }
+      [data-component-category] [style*="grid-template-columns"] { grid-template-columns: minmax(0, 1fr) !important; }
+      [data-component-category] [style*="display: flex"],
+      [data-component-category] [style*="display:flex"] { flex-wrap: wrap; }
     }
   </style>`;
 
@@ -97,7 +125,7 @@
     return `
       <div class="landing-zoom" aria-label="${type === "preview" ? "미리보기" : "캔버스"} 확대/축소">
         <button type="button" data-zoom="${type}:out" aria-label="축소">−</button>
-        <span>${zoomLabel(value)}</span>
+        <span data-zoom-label="${type}">${zoomLabel(value)}</span>
         <button type="button" data-zoom="${type}:in" aria-label="확대">＋</button>
         <button type="button" data-zoom="${type}:reset">100%</button>
       </div>`;
@@ -224,7 +252,7 @@
         window.addEventListener("load", sendHeight);
         setTimeout(sendHeight, 100);
       <\/script>`;
-    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${componentSpacingOverrides}</head><body>${replaceAssetUrls(component.html)}${bridge}</body></html>`;
+    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${editorComponentSpacingOverrides}</head><body>${replaceAssetUrls(component.html)}${bridge}</body></html>`;
   }
 
   function previewDocument() {
@@ -235,7 +263,7 @@
     ]
       .map((component) => replaceAssetUrls(component.html))
       .join("\n");
-    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${componentSpacingOverrides}</head><body>${content}</body></html>`;
+    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${outputDocumentBaseStyles}</head><body>${content}</body></html>`;
   }
 
   function exportDocument(page = activePage()) {
@@ -254,7 +282,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHTML(page?.persona_name || "Landing Page")}</title>
-${componentSpacingOverrides}
+${outputDocumentBaseStyles}
 <!-- UX 배치 의도
 ${uxIntentComment} -->
 </head>
@@ -523,7 +551,7 @@ ${uxIntentComment} -->
               </ul>
             </section>
             <div class="landing-canvas-wrap">
-              <div class="landing-canvas-stage" style="--landing-zoom: ${state.zoom}">
+              <div class="landing-canvas-stage" style="--landing-zoom: ${state.zoom}; --landing-canvas-width: 1080px">
                 <div class="landing-canvas" data-landing-canvas>
                   ${header}
                   ${components}
@@ -605,6 +633,32 @@ ${uxIntentComment} -->
         frame.style.height = `${frameHeight(frame, frame.contentDocument?.documentElement.scrollHeight)}px`;
       });
     });
+    observeCanvasSize(root);
+  }
+
+  function fitCanvasToViewport(root) {
+    const wrap = root.querySelector(".landing-canvas-wrap");
+    const stage = root.querySelector(".landing-canvas-stage");
+    if (!wrap || !stage) return;
+    const styles = window.getComputedStyle(wrap);
+    const availableWidth = wrap.clientWidth
+      - Number.parseFloat(styles.paddingLeft)
+      - Number.parseFloat(styles.paddingRight);
+    const nextZoom = Math.min(1, Math.max(zoomMin, availableWidth / 1080));
+    if (Math.abs(state.zoom - nextZoom) < 0.01) return;
+    state.zoom = Number(nextZoom.toFixed(3));
+    stage.style.setProperty("--landing-zoom", state.zoom);
+    const zoomLabelNode = root.querySelector('[data-zoom-label="canvas"]');
+    if (zoomLabelNode) zoomLabelNode.textContent = zoomLabel(state.zoom);
+  }
+
+  function observeCanvasSize(root) {
+    const wrap = root.querySelector(".landing-canvas-wrap");
+    canvasResizeObserver?.disconnect();
+    if (!wrap || !("ResizeObserver" in window)) return;
+    canvasResizeObserver = new ResizeObserver(() => fitCanvasToViewport(root));
+    canvasResizeObserver.observe(wrap);
+    window.requestAnimationFrame(() => fitCanvasToViewport(root));
   }
 
   function frameHeight(frame, height) {
@@ -714,19 +768,12 @@ ${uxIntentComment} -->
     const closePreview = event.target.closest("[data-close-preview]");
     const save = event.target.closest("[data-save]");
     const zoom = event.target.closest("[data-zoom]");
-    const device = event.target.closest("[data-device]");
     const resetPage = event.target.closest("[data-reset-page]");
     const openPreview = event.target.closest("[data-open-preview]");
     const downloadHtml = event.target.closest("[data-download-html]");
     const backFinalCheck = event.target.closest("[data-back-final-check]");
     if (backFinalCheck) {
       window.location.hash = "#final-check";
-      return;
-    }
-    if (device) {
-      state.device = device.dataset.device === "mobile" ? "mobile" : "desktop";
-      state.zoom = state.device === "mobile" ? 0.5 : 0.8;
-      requestRender();
       return;
     }
     if (zoom) {

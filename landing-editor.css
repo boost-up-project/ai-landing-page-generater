@@ -85,12 +85,6 @@ body[data-screen="landing-editor"] #app {
   line-height: 1.25;
 }
 
-.landing-editor__actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
 .landing-zoom {
   display: flex;
   height: 30px;
@@ -127,36 +121,6 @@ body[data-screen="landing-editor"] #app {
 .landing-zoom button:last-child {
   min-width: 46px;
   border-right: 0;
-}
-
-.landing-editor__actions {
-  justify-content: flex-end;
-}
-
-.landing-device-toggle {
-  display: flex;
-  padding: 2px;
-  border-radius: 8px;
-  background: #f2f4f6;
-}
-
-.landing-device-toggle button {
-  padding: 5px 10px;
-  border-radius: 6px;
-  color: #818b98;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.landing-device-toggle button.is-active {
-  background: #fff;
-  color: #1f2328;
-  box-shadow: 0 1px 2px rgba(31, 35, 40, 0.08);
-}
-
-.landing-editor__actions .landing-button:disabled {
-  opacity: 0.6;
-  cursor: wait;
 }
 
 .landing-save-status {
@@ -538,11 +502,13 @@ body[data-screen="landing-editor"] #app {
   display: flex;
   width: min(100%, var(--content-width));
   align-items: center;
+  gap: 12px;
   margin: 0 auto;
 }
 
 .landing-center__tools .landing-editor__tabs {
-  width: 100%;
+  min-width: 0;
+  flex: 1;
 }
 
 .landing-export-actions {
@@ -599,14 +565,15 @@ body[data-screen="landing-editor"] #app {
   min-width: 0;
   justify-content: center;
   align-content: start;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 0 22px 90px;
   background: #f2f4f6;
 }
 
 .landing-canvas-stage {
   position: relative;
-  width: calc(1080px * var(--landing-zoom));
+  width: calc(var(--landing-canvas-width) * var(--landing-zoom));
   min-height: calc((100vh - 180px) * var(--landing-zoom));
   margin: 0 auto;
 }
@@ -615,7 +582,7 @@ body[data-screen="landing-editor"] #app {
   position: absolute;
   top: 0;
   left: 50%;
-  width: 1080px;
+  width: var(--landing-canvas-width);
   min-height: calc(100vh - 180px);
   transform: translateX(-50%) scale(var(--landing-zoom));
   transform-origin: top center;
@@ -625,7 +592,7 @@ body[data-screen="landing-editor"] #app {
   background: #fff;
 }
 
-.landing-canvas [data-component-category]:not(header) {
+.landing-canvas [data-component-category]:not([data-component-category="header"]) {
   width: auto !important;
   margin-inline: 46px !important;
 }
@@ -1256,7 +1223,7 @@ body[data-screen="landing-editor"] #app {
 .landing-preview__stage {
   position: relative;
   width: calc(1440px * var(--landing-zoom));
-  height: calc(100vh - 108px);
+  height: calc((100vh - 108px) * var(--landing-zoom));
   margin: 0 auto;
 }
 
@@ -1267,7 +1234,7 @@ body[data-screen="landing-editor"] #app {
   display: block;
   width: 1440px;
   height: calc(100vh - 108px);
-  transform: translateX(-50%) scaleX(var(--landing-zoom)) scaleY(1);
+  transform: translateX(-50%) scale(var(--landing-zoom));
   transform-origin: top center;
   margin: 0 auto;
   border: 0;
@@ -1291,7 +1258,4 @@ body[data-screen="landing-editor"] #app {
     width: 200px;
   }
 
-  .landing-editor__actions {
-    gap: 5px;
-  }
 }
