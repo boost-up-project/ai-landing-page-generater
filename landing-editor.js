@@ -36,7 +36,7 @@
   const zoomMin = 0.5;
   const zoomMax = 1.5;
   const zoomStep = 0.1;
-  const componentSpacingOverrides = `<style>
+  const editorComponentSpacingOverrides = `<style>
     [data-editable="copy"] {
       word-break: keep-all !important;
       overflow-wrap: break-word !important;
@@ -53,6 +53,7 @@
       margin-top: 64px !important;
     }
   </style>`;
+  const outputDocumentBaseStyles = "<style>html,body{margin:0;padding:0}</style>";
 
   function escapeHTML(value = "") {
     return String(value)
@@ -224,7 +225,7 @@
         window.addEventListener("load", sendHeight);
         setTimeout(sendHeight, 100);
       <\/script>`;
-    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${componentSpacingOverrides}</head><body>${replaceAssetUrls(component.html)}${bridge}</body></html>`;
+    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${editorComponentSpacingOverrides}</head><body>${replaceAssetUrls(component.html)}${bridge}</body></html>`;
   }
 
   function previewDocument() {
@@ -235,7 +236,7 @@
     ]
       .map((component) => replaceAssetUrls(component.html))
       .join("\n");
-    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${componentSpacingOverrides}</head><body>${content}</body></html>`;
+    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${outputDocumentBaseStyles}</head><body>${content}</body></html>`;
   }
 
   function exportDocument(page = activePage()) {
@@ -254,7 +255,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHTML(page?.persona_name || "Landing Page")}</title>
-${componentSpacingOverrides}
+${outputDocumentBaseStyles}
 <!-- UX 배치 의도
 ${uxIntentComment} -->
 </head>

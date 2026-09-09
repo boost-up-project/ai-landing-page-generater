@@ -1256,7 +1256,7 @@ body[data-screen="landing-editor"] #app {
 .landing-preview__stage {
   position: relative;
   width: calc(1440px * var(--landing-zoom));
-  height: calc(100vh - 108px);
+  height: calc((100vh - 108px) * var(--landing-zoom));
   margin: 0 auto;
 }
 
@@ -1267,7 +1267,7 @@ body[data-screen="landing-editor"] #app {
   display: block;
   width: 1440px;
   height: calc(100vh - 108px);
-  transform: translateX(-50%) scaleX(var(--landing-zoom)) scaleY(1);
+  transform: translateX(-50%) scale(var(--landing-zoom));
   transform-origin: top center;
   margin: 0 auto;
   border: 0;
